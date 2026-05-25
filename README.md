@@ -1,23 +1,25 @@
 # Dyeing
 
-`Dyeing` 是一个基于 Minecraft `1.20.1` 与 Forge `47.x` 的服务端/客户端同步模组，用于给 `LivingEntity` 添加一层可染色、可缩放、可播放动画的“油漆层”渲染效果。
+`Dyeing` 是一个基于 Minecraft `1.20.1` 与 Forge `47.x` 的服务端/客户端同步模组，用于给实体添加可染色、可缩放、可播放动画的油漆渲染效果，既支持生物模型表面的油漆层，也支持绑定实体的长方体区域表面油漆。
 
 ## 功能说明
 
 - 支持为生物实体添加一层覆盖原模型动作的油漆层。
 - 支持静态颜色与静态缩放。
+- 支持每种油漆层单独设置 XYZ 三轴偏移。
 - 支持缩放动画。
 - 支持颜色渐变动画。
 - 支持同时启用缩放动画和颜色渐变。
+- 支持绑定实体并渲染随实体移动的长方体区域表面油漆。
 - 支持十六进制颜色中的透明度。
 - 支持指令修改后即时同步到客户端。
 - 支持数据持久化保存到世界存档。
 
 ## 支持范围
 
-- 当前仅支持 `LivingEntity`。
+- 模型表面油漆层仅支持 `LivingEntity`。
 - 原版生物、玩家、盔甲架，以及大多数使用常规 `LivingEntityRenderer` 的 Blockbench 生物模型都可用。
-- 不支持矿车、抛射物、展示实体等非 `LivingEntity` 实体。
+- 绑定区域表面油漆可绑定任意已加载实体，只要客户端当前能拿到该实体。
 
 ## 指令权限
 
@@ -25,20 +27,23 @@
 
 ## 指令总览
 
-- 根指令同时注册了 `/dyeing` 与 `/Dyeing`。
-- `/Dyeing add` 下支持 `scale`、`color`、`combo` 补全选项。
+- 现在只保留一个根指令：`/dyeing`。
+- `/dyeing paint add` 下支持 `static`、`scale`、`color`、`combo` 四个补全选项。
+- 新增 `/dyeing area add ...` 与 `/dyeing area remove ...` 用于区域表面油漆。
+- `/dyeing paint remove` 用于移除实体模型油漆层。
+- `/dyeing remove all` 用于同时移除油漆层和区域油漆。
 
 ## 静态油漆层
 
 ```mcfunction
-/Dyeing add <实体UUID> <十六进制颜色> [缩放]
+/dyeing paint add static <实体UUID> <十六进制颜色> [缩放] [offset_x offset_y offset_z]
 ```
 
 示例：
 
 ```mcfunction
-/Dyeing add 123e4567-e89b-12d3-a456-426614174000 FF00FF00
-/Dyeing add 123e4567-e89b-12d3-a456-426614174000 80FF0000 1.2
+/dyeing paint add static 123e4567-e89b-12d3-a456-426614174000 FF00FF00
+/dyeing paint add static 123e4567-e89b-12d3-a456-426614174000 80FF0000 1.2
 ```
 
 说明：
@@ -46,17 +51,18 @@
 - `实体UUID`：目标生物实体的 UUID。
 - `十六进制颜色`：支持 `RRGGBB`、`AARRGGBB`、`#RRGGBB`、`0xAARRGGBB`。
 - `缩放`：可选，默认 `1.0`。
+- `offset_x offset_y offset_z`：可选，默认 `0 0 0`，会在默认油漆层位置基础上追加三轴偏移。
 
 ## 缩放动画
 
 ```mcfunction
-/Dyeing add scale <实体UUID> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period>
+/dyeing paint add scale <实体UUID> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period> [offset_x offset_y offset_z]
 ```
 
 示例：
 
 ```mcfunction
-/Dyeing add scale 123e4567-e89b-12d3-a456-426614174000 FFFF0000 0.8 1.4 0.2 1.0 40
+/dyeing paint add scale 123e4567-e89b-12d3-a456-426614174000 FFFF0000 0.8 1.4 0.2 1.0 40
 ```
 
 说明：
@@ -67,17 +73,18 @@
 - `alpha_from`：动画起点透明度系数，范围 `0.0 ~ 1.0`。
 - `alpha_to`：动画终点透明度系数，范围 `0.0 ~ 1.0`。
 - `period`：变化周期，单位 `tick`。
+- `offset_x offset_y offset_z`：可选，默认 `0 0 0`。
 
 ## 颜色渐变动画
 
 ```mcfunction
-/Dyeing add color <实体UUID> <color_from> <color_to> <scale> <period>
+/dyeing paint add color <实体UUID> <color_from> <color_to> <scale> <period> [offset_x offset_y offset_z]
 ```
 
 示例：
 
 ```mcfunction
-/Dyeing add color 123e4567-e89b-12d3-a456-426614174000 40FF0000 C00000FF 1.0 60
+/dyeing paint add color 123e4567-e89b-12d3-a456-426614174000 40FF0000 C00000FF 1.0 60
 ```
 
 说明：
@@ -86,6 +93,7 @@
 - `color_to`：终点颜色。
 - `scale`：颜色变化期间使用的固定缩放。
 - `period`：变化周期，单位 `tick`。
+- `offset_x offset_y offset_z`：可选，默认 `0 0 0`。
 
 注意：
 
@@ -94,31 +102,127 @@
 ## 组合动画
 
 ```mcfunction
-/Dyeing add combo <实体UUID> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period>
+/dyeing paint add combo <实体UUID> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period> [offset_x offset_y offset_z]
 ```
 
 示例：
 
 ```mcfunction
-/Dyeing add combo 123e4567-e89b-12d3-a456-426614174000 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
+/dyeing paint add combo 123e4567-e89b-12d3-a456-426614174000 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
 ```
 
 说明：
 
 - 同时启用缩放动画与颜色渐变动画。
 - `scale_period` 与 `color_period` 可分别设置。
+- `offset_x offset_y offset_z`：可选，默认 `0 0 0`。
 
-## 移除油漆层
+## 偏移说明
+
+- 偏移是相对于油漆层默认渲染位置追加的本地三轴位移。
+- 三个值分别对应 `X`、`Y`、`Z`。
+- 不填写时默认都是 `0`。
+- 偏移会与静态、缩放动画、颜色渐变、组合动画一起生效。
+
+## 区域表面油漆
+
+区域表面油漆会绑定一个实体，以该实体当前坐标为原点，`from` 和 `to` 两组 XYZ 偏移定义一个轴对齐长方体，渲染这个长方体的 6 个外表面。
+
+- 区域会实时跟随绑定实体移动。
+- `scale` 语义为整体放缩，会同时缩放 `from/to` 两组偏移。
+- 当前实现为每个绑定实体最多保存一个区域表面油漆。
+- 区域命令的参数顺序固定为：`实体UUID -> from_x/y/z -> to_x/y/z -> 颜色或动画参数`。
+- 为减少区域表面闪烁，区域 6 个外表面现在会做极小外扩，并避免同一平面重复绘制。
+
+### 区域静态模式
 
 ```mcfunction
-/Dyeing remove <实体UUID>
+/dyeing area add static <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> [缩放]
 ```
 
 示例：
 
 ```mcfunction
-/Dyeing remove 123e4567-e89b-12d3-a456-426614174000
+/dyeing area add static 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 66FFAAFF
 ```
+
+### 区域缩放动画
+
+```mcfunction
+/dyeing area add scale <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period>
+```
+
+示例：
+
+```mcfunction
+/dyeing area add scale 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40
+```
+
+### 区域颜色渐变
+
+```mcfunction
+/dyeing area add color <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale> <period>
+```
+
+示例：
+
+```mcfunction
+/dyeing area add color 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60
+```
+
+### 区域组合动画
+
+```mcfunction
+/dyeing area add combo <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period>
+```
+
+示例：
+
+```mcfunction
+/dyeing area add combo 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
+```
+
+### 移除区域油漆
+
+```mcfunction
+/dyeing area remove <实体UUID>
+```
+
+示例：
+
+```mcfunction
+/dyeing area remove 123e4567-e89b-12d3-a456-426614174000
+```
+
+## 移除油漆层
+
+```mcfunction
+/dyeing paint remove <实体UUID>
+```
+
+示例：
+
+```mcfunction
+/dyeing paint remove 123e4567-e89b-12d3-a456-426614174000
+```
+
+## 移除全部
+
+```mcfunction
+/dyeing remove all <实体UUID>
+```
+
+示例：
+
+```mcfunction
+/dyeing remove all 123e4567-e89b-12d3-a456-426614174000
+```
+
+## 移除区域或全部说明
+
+- `/dyeing paint remove <实体UUID>`：仅移除实体模型表面的油漆层。
+- `/dyeing remove area <实体UUID>`：仅移除绑定实体的区域表面油漆。
+- `/dyeing remove all <实体UUID>`：同时移除油漆层和区域表面油漆。
 
 ## 动画规则
 
@@ -139,7 +243,7 @@
 - 使用命令选中目标实体后读取 UUID。
 - 在开发环境中通过日志、脚本或自定义命令输出 UUID。
 
-本模组要求目标实体当前已加载，否则无法通过 `/Dyeing add ...` 直接写入。
+本模组要求目标实体当前已加载，否则无法通过 `/dyeing paint add ...` 或 `/dyeing area add ...` 直接写入。
 
 ## 开发与构建
 

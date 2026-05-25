@@ -1,7 +1,10 @@
 package com.example.dyeing;
 
 import com.example.dyeing.client.ClientPaintManager;
+import com.example.dyeing.client.AreaPaintRenderer;
 import com.example.dyeing.client.PaintRenderLayer;
+import com.example.dyeing.data.AreaPaintData;
+import com.example.dyeing.data.AreaPaintSavedData;
 import com.example.dyeing.command.DyeingCommand;
 import com.example.dyeing.data.PaintData;
 import com.example.dyeing.data.PaintSavedData;
@@ -14,6 +17,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -46,8 +50,13 @@ public class DyeingMod {
         return PaintSavedData.get(server);
     }
 
+    public static AreaPaintSavedData getAreaPaintData(net.minecraft.server.MinecraftServer server) {
+        return AreaPaintSavedData.get(server);
+    }
+
     public static void syncFull(ServerPlayer player) {
         DyeingNetwork.sendFullSync(player, getPaintData(player.server).getEntries());
+        DyeingNetwork.sendFullAreaSync(player, getAreaPaintData(player.server).getEntries());
     }
 
     public static void broadcastUpdate(UUID entityUuid, PaintData paintData) {
@@ -56,6 +65,14 @@ public class DyeingMod {
 
     public static void broadcastRemove(UUID entityUuid) {
         DyeingNetwork.broadcastRemove(entityUuid);
+    }
+
+    public static void broadcastAreaUpdate(UUID entityUuid, AreaPaintData areaPaintData) {
+        DyeingNetwork.broadcastAreaUpdate(entityUuid, areaPaintData);
+    }
+
+    public static void broadcastAreaRemove(UUID entityUuid) {
+        DyeingNetwork.broadcastAreaRemove(entityUuid);
     }
 
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -110,6 +127,11 @@ public class DyeingMod {
         @SubscribeEvent
         public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
             ClientPaintManager.clear();
+        }
+
+        @SubscribeEvent
+        public static void onRenderLevelStage(RenderLevelStageEvent event) {
+            AreaPaintRenderer.render(event);
         }
     }
 }

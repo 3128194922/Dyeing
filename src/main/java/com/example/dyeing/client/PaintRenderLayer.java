@@ -44,6 +44,9 @@ public class PaintRenderLayer<T extends LivingEntity, M extends EntityModel<T>> 
         }
 
         poseStack.pushPose();
+        if (renderState.offsetX() != 0.0F || renderState.offsetY() != 0.0F || renderState.offsetZ() != 0.0F) {
+            poseStack.translate(renderState.offsetX(), renderState.offsetY(), renderState.offsetZ());
+        }
         if (renderState.scale() != 1.0F) {
             poseStack.scale(renderState.scale(), renderState.scale(), renderState.scale());
         }

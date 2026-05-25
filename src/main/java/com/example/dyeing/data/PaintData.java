@@ -5,6 +5,9 @@ import net.minecraft.nbt.CompoundTag;
 public record PaintData(
         int argb,
         float scale,
+        float offsetX,
+        float offsetY,
+        float offsetZ,
         boolean hasScaleAnimation,
         float scaleFrom,
         float scaleTo,
@@ -17,7 +20,11 @@ public record PaintData(
         int colorPeriod
 ) {
     public static PaintData staticPaint(int argb, float scale) {
-        return new PaintData(argb, scale, false, scale, scale, 1.0F, 1.0F, 1, false, argb, argb, 1);
+        return staticPaint(argb, scale, 0.0F, 0.0F, 0.0F);
+    }
+
+    public static PaintData staticPaint(int argb, float scale, float offsetX, float offsetY, float offsetZ) {
+        return new PaintData(argb, scale, offsetX, offsetY, offsetZ, false, scale, scale, 1.0F, 1.0F, 1, false, argb, argb, 1);
     }
 
     public static PaintData withScaleAnimation(
@@ -26,13 +33,24 @@ public record PaintData(
             float scaleTo,
             float scaleAlphaFrom,
             float scaleAlphaTo,
-            int scalePeriod
+            int scalePeriod,
+            float offsetX,
+            float offsetY,
+            float offsetZ
     ) {
-        return new PaintData(argb, scaleFrom, true, scaleFrom, scaleTo, scaleAlphaFrom, scaleAlphaTo, scalePeriod, false, argb, argb, 1);
+        return new PaintData(argb, scaleFrom, offsetX, offsetY, offsetZ, true, scaleFrom, scaleTo, scaleAlphaFrom, scaleAlphaTo, scalePeriod, false, argb, argb, 1);
     }
 
-    public static PaintData withColorAnimation(int colorFromArgb, int colorToArgb, float scale, int colorPeriod) {
-        return new PaintData(colorFromArgb, scale, false, scale, scale, 1.0F, 1.0F, 1, true, colorFromArgb, colorToArgb, colorPeriod);
+    public static PaintData withColorAnimation(
+            int colorFromArgb,
+            int colorToArgb,
+            float scale,
+            int colorPeriod,
+            float offsetX,
+            float offsetY,
+            float offsetZ
+    ) {
+        return new PaintData(colorFromArgb, scale, offsetX, offsetY, offsetZ, false, scale, scale, 1.0F, 1.0F, 1, true, colorFromArgb, colorToArgb, colorPeriod);
     }
 
     public static PaintData withCombinedAnimation(
@@ -43,11 +61,17 @@ public record PaintData(
             float scaleAlphaFrom,
             float scaleAlphaTo,
             int scalePeriod,
-            int colorPeriod
+            int colorPeriod,
+            float offsetX,
+            float offsetY,
+            float offsetZ
     ) {
         return new PaintData(
                 colorFromArgb,
                 scaleFrom,
+                offsetX,
+                offsetY,
+                offsetZ,
                 true,
                 scaleFrom,
                 scaleTo,
@@ -65,6 +89,9 @@ public record PaintData(
         CompoundTag tag = new CompoundTag();
         tag.putInt("Color", this.argb);
         tag.putFloat("Scale", this.scale);
+        tag.putFloat("OffsetX", this.offsetX);
+        tag.putFloat("OffsetY", this.offsetY);
+        tag.putFloat("OffsetZ", this.offsetZ);
         tag.putBoolean("HasScaleAnimation", this.hasScaleAnimation);
         tag.putFloat("ScaleFrom", this.scaleFrom);
         tag.putFloat("ScaleTo", this.scaleTo);
@@ -80,6 +107,9 @@ public record PaintData(
 
     public static PaintData load(CompoundTag tag) {
         float savedScale = tag.contains("Scale") ? tag.getFloat("Scale") : 1.0F;
+        float offsetX = tag.contains("OffsetX") ? tag.getFloat("OffsetX") : 0.0F;
+        float offsetY = tag.contains("OffsetY") ? tag.getFloat("OffsetY") : 0.0F;
+        float offsetZ = tag.contains("OffsetZ") ? tag.getFloat("OffsetZ") : 0.0F;
         int savedColor = tag.getInt("Color");
         boolean hasScaleAnimation = tag.getBoolean("HasScaleAnimation");
         float scaleFrom = tag.contains("ScaleFrom") ? tag.getFloat("ScaleFrom") : savedScale;
@@ -94,6 +124,9 @@ public record PaintData(
         return new PaintData(
                 savedColor,
                 savedScale,
+                offsetX,
+                offsetY,
+                offsetZ,
                 hasScaleAnimation,
                 scaleFrom,
                 scaleTo,
@@ -122,7 +155,7 @@ public record PaintData(
         float green = ((resolvedColor >> 8) & 0xFF) / 255.0F;
         float blue = (resolvedColor & 0xFF) / 255.0F;
         float alpha = (((resolvedColor >>> 24) & 0xFF) / 255.0F) * alphaFactor;
-        return new PaintRenderState(red, green, blue, clamp01(alpha), resolvedScale);
+        return new PaintRenderState(red, green, blue, clamp01(alpha), resolvedScale, this.offsetX, this.offsetY, this.offsetZ);
     }
 
     private static float cycleProgress(float animationTime, int period) {
