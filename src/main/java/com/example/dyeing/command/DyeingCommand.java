@@ -3,6 +3,7 @@ package com.example.dyeing.command;
 import com.example.dyeing.DyeingMod;
 import com.example.dyeing.data.AreaPaintData;
 import com.example.dyeing.data.AreaPaintSavedData;
+import com.example.dyeing.data.AnimationEndAction;
 import com.example.dyeing.data.PaintData;
 import com.example.dyeing.data.PaintSavedData;
 import com.example.dyeing.util.ColorParser;
@@ -18,6 +19,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.UuidArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -36,6 +38,12 @@ public final class DyeingCommand {
     );
     private static final SimpleCommandExceptionType NO_AREA_PAINT_DATA = new SimpleCommandExceptionType(
             Component.literal("该 UUID 没有已保存的区域油漆数据")
+    );
+    private static final SimpleCommandExceptionType INVALID_PLAY_COUNT = new SimpleCommandExceptionType(
+            Component.literal("播放次数只能是 -1 或大于等于 1 的整数")
+    );
+    private static final SimpleCommandExceptionType INVALID_END_ACTION = new SimpleCommandExceptionType(
+            Component.literal("结束行为只能是 start、end、remove")
     );
 
     private DyeingCommand() {
@@ -101,7 +109,9 @@ public final class DyeingCommand {
                                                         .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
                                                                 .then(Commands.argument("period", IntegerArgumentType.integer(1))
                                                                         .executes(DyeingCommand::addScaleAnimation)
-                                                                        .then(createOffsetArguments(DyeingCommand::addScaleAnimation)))))))));
+                                                                        .then(createOffsetThenSingleAnimationOptions("play_count", "end_action", DyeingCommand::addScaleAnimation))
+                                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addScaleAnimation))
+                                                        )))))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createColorAddBranch() {
@@ -112,7 +122,9 @@ public final class DyeingCommand {
                                         .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
                                                 .then(Commands.argument("period", IntegerArgumentType.integer(1))
                                                         .executes(DyeingCommand::addColorAnimation)
-                                                        .then(createOffsetArguments(DyeingCommand::addColorAnimation)))))));
+                                                        .then(createOffsetThenSingleAnimationOptions("play_count", "end_action", DyeingCommand::addColorAnimation))
+                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addColorAnimation))
+                                        )))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createComboAddBranch() {
@@ -127,7 +139,8 @@ public final class DyeingCommand {
                                                                         .then(Commands.argument("scale_period", IntegerArgumentType.integer(1))
                                                                                 .then(Commands.argument("color_period", IntegerArgumentType.integer(1))
                                                                                         .executes(DyeingCommand::addCombinedAnimation)
-                                                                                        .then(createOffsetArguments(DyeingCommand::addCombinedAnimation)))))))))));
+                                                                                        .then(createOffsetThenComboAnimationOptions(DyeingCommand::addCombinedAnimation))
+                                                                                        .then(createComboAnimationOptions(DyeingCommand::addCombinedAnimation)))))))))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createOffsetArguments(Command<CommandSourceStack> command) {
@@ -135,6 +148,51 @@ public final class DyeingCommand {
                 .then(Commands.argument("offset_y", FloatArgumentType.floatArg())
                         .then(Commands.argument("offset_z", FloatArgumentType.floatArg())
                                 .executes(command)));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createSingleAnimationOptions(
+            String playCountName,
+            String endActionName,
+            Command<CommandSourceStack> command
+    ) {
+        return Commands.argument(playCountName, IntegerArgumentType.integer(-1))
+                .executes(command)
+                .then(Commands.argument(endActionName, StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[]{"start", "end", "remove"}, builder))
+                        .executes(command));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createOffsetThenSingleAnimationOptions(
+            String playCountName,
+            String endActionName,
+            Command<CommandSourceStack> command
+    ) {
+        return Commands.argument("offset_x", FloatArgumentType.floatArg())
+                .then(Commands.argument("offset_y", FloatArgumentType.floatArg())
+                        .then(Commands.argument("offset_z", FloatArgumentType.floatArg())
+                                .executes(command)
+                                .then(createSingleAnimationOptions(playCountName, endActionName, command))));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createComboAnimationOptions(Command<CommandSourceStack> command) {
+        return Commands.argument("scale_play_count", IntegerArgumentType.integer(-1))
+                .executes(command)
+                .then(Commands.argument("scale_end_action", StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[]{"start", "end", "remove"}, builder))
+                        .executes(command)
+                        .then(Commands.argument("color_play_count", IntegerArgumentType.integer(-1))
+                                .executes(command)
+                                .then(Commands.argument("color_end_action", StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[]{"start", "end", "remove"}, builder))
+                                        .executes(command))));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createOffsetThenComboAnimationOptions(Command<CommandSourceStack> command) {
+        return Commands.argument("offset_x", FloatArgumentType.floatArg())
+                .then(Commands.argument("offset_y", FloatArgumentType.floatArg())
+                        .then(Commands.argument("offset_z", FloatArgumentType.floatArg())
+                                .executes(command)
+                                .then(createComboAnimationOptions(command))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createAreaStaticAddBranch() {
@@ -156,7 +214,8 @@ public final class DyeingCommand {
                                                 .then(Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F))
                                                         .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
                                                                 .then(Commands.argument("period", IntegerArgumentType.integer(1))
-                                                                        .executes(DyeingCommand::addAreaScaleAnimation)))))))
+                                                                        .executes(DyeingCommand::addAreaScaleAnimation)
+                                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaScaleAnimation))))))))
                 );
     }
 
@@ -167,7 +226,8 @@ public final class DyeingCommand {
                                 .then(Commands.argument("color_to", StringArgumentType.word())
                                         .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
                                                 .then(Commands.argument("period", IntegerArgumentType.integer(1))
-                                                        .executes(DyeingCommand::addAreaColorAnimation)))))
+                                                        .executes(DyeingCommand::addAreaColorAnimation)
+                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaColorAnimation))))))
                 );
     }
 
@@ -182,7 +242,8 @@ public final class DyeingCommand {
                                                                 .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
                                                                         .then(Commands.argument("scale_period", IntegerArgumentType.integer(1))
                                                                                 .then(Commands.argument("color_period", IntegerArgumentType.integer(1))
-                                                                                        .executes(DyeingCommand::addAreaCombinedAnimation)))))))))
+                                                                                        .executes(DyeingCommand::addAreaCombinedAnimation)
+                                                                                        .then(createComboAnimationOptions(DyeingCommand::addAreaCombinedAnimation))))))))))
                 );
     }
 
@@ -203,7 +264,7 @@ public final class DyeingCommand {
         String colorInput = StringArgumentType.getString(context, "hex_color");
         int argb = ColorParser.parse(colorInput);
 
-        PaintData paintData = PaintData.staticPaint(argb, scale, getOffsetX(context), getOffsetY(context), getOffsetZ(context));
+        PaintData paintData = PaintData.staticPaint(argb, scale, getOffsetX(context), getOffsetY(context), getOffsetZ(context), getCurrentGameTime(context));
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
         savedData.put(entityUuid, paintData);
         DyeingMod.broadcastUpdate(entityUuid, paintData);
@@ -234,7 +295,10 @@ public final class DyeingCommand {
                 period,
                 getOffsetX(context),
                 getOffsetY(context),
-                getOffsetZ(context)
+                getOffsetZ(context),
+                getCurrentGameTime(context),
+                getOptionalPlayCount(context, "play_count"),
+                getOptionalEndAction(context, "end_action")
         );
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
         savedData.put(entityUuid, paintData);
@@ -262,7 +326,10 @@ public final class DyeingCommand {
                 period,
                 getOffsetX(context),
                 getOffsetY(context),
-                getOffsetZ(context)
+                getOffsetZ(context),
+                getCurrentGameTime(context),
+                getOptionalPlayCount(context, "play_count"),
+                getOptionalEndAction(context, "end_action")
         );
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
         savedData.put(entityUuid, paintData);
@@ -298,7 +365,12 @@ public final class DyeingCommand {
                 colorPeriod,
                 getOffsetX(context),
                 getOffsetY(context),
-                getOffsetZ(context)
+                getOffsetZ(context),
+                getCurrentGameTime(context),
+                getOptionalPlayCount(context, "scale_play_count"),
+                getOptionalEndAction(context, "scale_end_action"),
+                getOptionalPlayCount(context, "color_play_count"),
+                getOptionalEndAction(context, "color_end_action")
         );
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
         savedData.put(entityUuid, paintData);
@@ -326,7 +398,7 @@ public final class DyeingCommand {
     private static int addAreaStatic(CommandContext<CommandSourceStack> context, float scale) throws CommandSyntaxException {
         Entity entity = findLoadedEntity(context.getSource(), UuidArgument.getUuid(context, "entity_uuid"));
         int argb = ColorParser.parse(StringArgumentType.getString(context, "hex_color"));
-        PaintData paintData = PaintData.staticPaint(argb, scale);
+        PaintData paintData = PaintData.staticPaint(argb, scale, 0.0F, 0.0F, 0.0F, getCurrentGameTime(context));
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
         savedData.put(entity.getUUID(), areaPaintData);
@@ -350,7 +422,10 @@ public final class DyeingCommand {
                 IntegerArgumentType.getInteger(context, "period"),
                 0.0F,
                 0.0F,
-                0.0F
+                0.0F,
+                getCurrentGameTime(context),
+                getOptionalPlayCount(context, "play_count"),
+                getOptionalEndAction(context, "end_action")
         );
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
@@ -372,7 +447,10 @@ public final class DyeingCommand {
                 IntegerArgumentType.getInteger(context, "period"),
                 0.0F,
                 0.0F,
-                0.0F
+                0.0F,
+                getCurrentGameTime(context),
+                getOptionalPlayCount(context, "play_count"),
+                getOptionalEndAction(context, "end_action")
         );
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
@@ -398,7 +476,12 @@ public final class DyeingCommand {
                 IntegerArgumentType.getInteger(context, "color_period"),
                 0.0F,
                 0.0F,
-                0.0F
+                0.0F,
+                getCurrentGameTime(context),
+                getOptionalPlayCount(context, "scale_play_count"),
+                getOptionalEndAction(context, "scale_end_action"),
+                getOptionalPlayCount(context, "color_play_count"),
+                getOptionalEndAction(context, "color_end_action")
         );
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
@@ -484,6 +567,39 @@ public final class DyeingCommand {
         } catch (IllegalArgumentException exception) {
             return 0.0F;
         }
+    }
+
+    private static int getOptionalPlayCount(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException {
+        int value;
+        try {
+            value = IntegerArgumentType.getInteger(context, name);
+        } catch (IllegalArgumentException exception) {
+            return -1;
+        }
+
+        if (value == 0 || value < -1) {
+            throw INVALID_PLAY_COUNT.create();
+        }
+        return value;
+    }
+
+    private static AnimationEndAction getOptionalEndAction(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException {
+        String value;
+        try {
+            value = StringArgumentType.getString(context, name);
+        } catch (IllegalArgumentException exception) {
+            return AnimationEndAction.END;
+        }
+
+        try {
+            return AnimationEndAction.fromCommandName(value);
+        } catch (IllegalArgumentException exception) {
+            throw INVALID_END_ACTION.create();
+        }
+    }
+
+    private static long getCurrentGameTime(CommandContext<CommandSourceStack> context) {
+        return context.getSource().getServer().overworld().getGameTime();
     }
 
     private static AreaPaintData createAreaPaintData(CommandContext<CommandSourceStack> context, PaintData paintData) throws CommandSyntaxException {

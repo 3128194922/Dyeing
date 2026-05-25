@@ -50,7 +50,7 @@ public final class AreaPaintRenderer {
                 continue;
             }
 
-            PaintRenderState renderState = areaPaintData.paintData().resolve(entity.tickCount + partialTick);
+            PaintRenderState renderState = areaPaintData.paintData().resolve(entity.level().getGameTime() + partialTick);
             if (renderState.alpha() <= 0.0F) {
                 continue;
             }

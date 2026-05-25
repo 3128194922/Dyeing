@@ -20,6 +20,7 @@ import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -75,6 +76,24 @@ public class DyeingMod {
         DyeingNetwork.broadcastAreaRemove(entityUuid);
     }
 
+    public static void cleanupFinishedAnimations(net.minecraft.server.MinecraftServer server) {
+        long currentGameTime = server.overworld().getGameTime();
+
+        for (UUID entityUuid : getPaintData(server).getEntries().keySet()) {
+            PaintData paintData = getPaintData(server).getEntries().get(entityUuid);
+            if (paintData != null && paintData.shouldAutoRemove(currentGameTime) && getPaintData(server).remove(entityUuid)) {
+                broadcastRemove(entityUuid);
+            }
+        }
+
+        for (UUID entityUuid : getAreaPaintData(server).getEntries().keySet()) {
+            AreaPaintData areaPaintData = getAreaPaintData(server).getEntries().get(entityUuid);
+            if (areaPaintData != null && areaPaintData.paintData().shouldAutoRemove(currentGameTime) && getAreaPaintData(server).remove(entityUuid)) {
+                broadcastAreaRemove(entityUuid);
+            }
+        }
+    }
+
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
     public static final class ForgeEvents {
         private ForgeEvents() {
@@ -89,6 +108,13 @@ public class DyeingMod {
         public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
             if (event.getEntity() instanceof ServerPlayer serverPlayer) {
                 syncFull(serverPlayer);
+            }
+        }
+
+        @SubscribeEvent
+        public static void onServerTick(TickEvent.ServerTickEvent event) {
+            if (event.phase == TickEvent.Phase.END) {
+                cleanupFinishedAnimations(event.getServer());
             }
         }
     }

@@ -38,7 +38,7 @@ public class PaintRenderLayer<T extends LivingEntity, M extends EntityModel<T>> 
             return;
         }
 
-        PaintRenderState renderState = paintData.resolve(entity.tickCount + partialTick);
+        PaintRenderState renderState = paintData.resolve(entity.level().getGameTime() + partialTick);
         if (renderState.alpha() <= 0.0F) {
             return;
         }

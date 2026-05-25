@@ -3,6 +3,7 @@ package com.example.dyeing.network;
 import com.example.dyeing.DyeingMod;
 import com.example.dyeing.client.ClientPaintManager;
 import com.example.dyeing.data.AreaPaintData;
+import com.example.dyeing.data.AnimationEndAction;
 import com.example.dyeing.data.PaintData;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -220,16 +221,21 @@ public final class DyeingNetwork {
         buffer.writeFloat(paintData.offsetX());
         buffer.writeFloat(paintData.offsetY());
         buffer.writeFloat(paintData.offsetZ());
+        buffer.writeLong(paintData.startGameTime());
         buffer.writeBoolean(paintData.hasScaleAnimation());
         buffer.writeFloat(paintData.scaleFrom());
         buffer.writeFloat(paintData.scaleTo());
         buffer.writeFloat(paintData.scaleAlphaFrom());
         buffer.writeFloat(paintData.scaleAlphaTo());
         buffer.writeVarInt(paintData.scalePeriod());
+        buffer.writeVarInt(paintData.scalePlayCount() + 1);
+        buffer.writeEnum(paintData.scaleEndAction());
         buffer.writeBoolean(paintData.hasColorAnimation());
         buffer.writeInt(paintData.colorFromArgb());
         buffer.writeInt(paintData.colorToArgb());
         buffer.writeVarInt(paintData.colorPeriod());
+        buffer.writeVarInt(paintData.colorPlayCount() + 1);
+        buffer.writeEnum(paintData.colorEndAction());
     }
 
     private static PaintData readPaintData(FriendlyByteBuf buffer) {
@@ -238,32 +244,42 @@ public final class DyeingNetwork {
         float offsetX = buffer.readFloat();
         float offsetY = buffer.readFloat();
         float offsetZ = buffer.readFloat();
+        long startGameTime = buffer.readLong();
         boolean hasScaleAnimation = buffer.readBoolean();
         float scaleFrom = buffer.readFloat();
         float scaleTo = buffer.readFloat();
         float scaleAlphaFrom = buffer.readFloat();
         float scaleAlphaTo = buffer.readFloat();
         int scalePeriod = buffer.readVarInt();
+        int scalePlayCount = buffer.readVarInt() - 1;
+        AnimationEndAction scaleEndAction = buffer.readEnum(AnimationEndAction.class);
         boolean hasColorAnimation = buffer.readBoolean();
         int colorFromArgb = buffer.readInt();
         int colorToArgb = buffer.readInt();
         int colorPeriod = buffer.readVarInt();
+        int colorPlayCount = buffer.readVarInt() - 1;
+        AnimationEndAction colorEndAction = buffer.readEnum(AnimationEndAction.class);
         return new PaintData(
                 argb,
                 scale,
                 offsetX,
                 offsetY,
                 offsetZ,
+                startGameTime,
                 hasScaleAnimation,
                 scaleFrom,
                 scaleTo,
                 scaleAlphaFrom,
                 scaleAlphaTo,
                 scalePeriod,
+                scalePlayCount,
+                scaleEndAction,
                 hasColorAnimation,
                 colorFromArgb,
                 colorToArgb,
-                colorPeriod
+                colorPeriod,
+                colorPlayCount,
+                colorEndAction
         );
     }
 
