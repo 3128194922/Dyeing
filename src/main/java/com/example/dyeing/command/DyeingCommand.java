@@ -200,8 +200,10 @@ public final class DyeingCommand {
                 .then(createAreaBoundsArguments(
                         Commands.argument("hex_color", StringArgumentType.word())
                                 .executes(context -> addAreaStatic(context, 1.0F))
+                                .then(createAreaRotationOptions(context -> addAreaStatic(context, 1.0F)))
                                 .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
-                                        .executes(context -> addAreaStatic(context, FloatArgumentType.getFloat(context, "scale"))))
+                                        .executes(context -> addAreaStatic(context, FloatArgumentType.getFloat(context, "scale")))
+                                        .then(createAreaRotationOptions(context -> addAreaStatic(context, FloatArgumentType.getFloat(context, "scale")))))
                 ));
     }
 
@@ -215,7 +217,8 @@ public final class DyeingCommand {
                                                         .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
                                                                 .then(Commands.argument("period", IntegerArgumentType.integer(1))
                                                                         .executes(DyeingCommand::addAreaScaleAnimation)
-                                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaScaleAnimation))))))))
+                                                                        .then(createAreaRotationOptions(DyeingCommand::addAreaScaleAnimation))
+                                                                        .then(createAreaSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaScaleAnimation))))))))
                 );
     }
 
@@ -227,7 +230,8 @@ public final class DyeingCommand {
                                         .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
                                                 .then(Commands.argument("period", IntegerArgumentType.integer(1))
                                                         .executes(DyeingCommand::addAreaColorAnimation)
-                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaColorAnimation))))))
+                                                        .then(createAreaRotationOptions(DyeingCommand::addAreaColorAnimation))
+                                                        .then(createAreaSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaColorAnimation))))))
                 );
     }
 
@@ -243,7 +247,8 @@ public final class DyeingCommand {
                                                                         .then(Commands.argument("scale_period", IntegerArgumentType.integer(1))
                                                                                 .then(Commands.argument("color_period", IntegerArgumentType.integer(1))
                                                                                         .executes(DyeingCommand::addAreaCombinedAnimation)
-                                                                                        .then(createComboAnimationOptions(DyeingCommand::addAreaCombinedAnimation))))))))))
+                                                                                        .then(createAreaRotationOptions(DyeingCommand::addAreaCombinedAnimation))
+                                                                                        .then(createAreaComboAnimationOptions(DyeingCommand::addAreaCombinedAnimation))))))))))
                 );
     }
 
@@ -612,7 +617,67 @@ public final class DyeingCommand {
                 FloatArgumentType.getFloat(context, "to_x"),
                 FloatArgumentType.getFloat(context, "to_y"),
                 FloatArgumentType.getFloat(context, "to_z"),
-                paintData
+                paintData,
+                getOptionalRotationPeriod(context),
+                getOptionalRotationMode(context)
         );
+    }
+
+    private static int getOptionalRotationPeriod(CommandContext<CommandSourceStack> context) {
+        try {
+            return IntegerArgumentType.getInteger(context, "rotation_period");
+        } catch (IllegalArgumentException exception) {
+            return 0;
+        }
+    }
+
+    private static int getOptionalRotationMode(CommandContext<CommandSourceStack> context) {
+        try {
+            int value = IntegerArgumentType.getInteger(context, "rotation_mode");
+            if (value == 0) {
+                return -1;
+            }
+            return value;
+        } catch (IllegalArgumentException exception) {
+            return -1;
+        }
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createAreaRotationOptions(Command<CommandSourceStack> command) {
+        return Commands.argument("rotation_period", IntegerArgumentType.integer())
+                .executes(command)
+                .then(Commands.argument("rotation_mode", IntegerArgumentType.integer(-1))
+                        .executes(command));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createAreaSingleAnimationOptions(
+            String playCountName,
+            String endActionName,
+            Command<CommandSourceStack> command
+    ) {
+        return Commands.argument(playCountName, IntegerArgumentType.integer(-1))
+                .executes(command)
+                .then(createAreaRotationOptions(command))
+                .then(Commands.argument(endActionName, StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[]{"start", "end", "remove"}, builder))
+                        .executes(command)
+                        .then(createAreaRotationOptions(command)));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createAreaComboAnimationOptions(Command<CommandSourceStack> command) {
+        return Commands.argument("scale_play_count", IntegerArgumentType.integer(-1))
+                .executes(command)
+                .then(createAreaRotationOptions(command))
+                .then(Commands.argument("scale_end_action", StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[]{"start", "end", "remove"}, builder))
+                        .executes(command)
+                        .then(createAreaRotationOptions(command))
+                        .then(Commands.argument("color_play_count", IntegerArgumentType.integer(-1))
+                                .executes(command)
+                                .then(createAreaRotationOptions(command))
+                                .then(Commands.argument("color_end_action", StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[]{"start", "end", "remove"}, builder))
+                                        .executes(command)
+                                        .then(createAreaRotationOptions(command)))));
     }
 }

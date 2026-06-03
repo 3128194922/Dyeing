@@ -292,6 +292,8 @@ public final class DyeingNetwork {
         buffer.writeFloat(areaPaintData.toY());
         buffer.writeFloat(areaPaintData.toZ());
         writePaintData(buffer, areaPaintData.paintData());
+        buffer.writeVarInt(areaPaintData.rotationPeriod());
+        buffer.writeVarInt(areaPaintData.rotationMode());
     }
 
     private static AreaPaintData readAreaPaintData(FriendlyByteBuf buffer) {
@@ -303,6 +305,8 @@ public final class DyeingNetwork {
         float toY = buffer.readFloat();
         float toZ = buffer.readFloat();
         PaintData paintData = readPaintData(buffer);
-        return new AreaPaintData(entityUuid, fromX, fromY, fromZ, toX, toY, toZ, paintData);
+        int rotationPeriod = buffer.readVarInt();
+        int rotationMode = buffer.readVarInt();
+        return new AreaPaintData(entityUuid, fromX, fromY, fromZ, toX, toY, toZ, paintData, rotationPeriod, rotationMode);
     }
 }

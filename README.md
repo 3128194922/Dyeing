@@ -13,6 +13,7 @@
 - 支持为所有动画设置播放次数，默认 `-1` 表示无限循环。
 - 支持为所有动画设置播放结束行为：回到起点、停在终点、自动移除。
 - 支持绑定实体并渲染随实体移动的长方体区域表面油漆。
+- 支持区域绕实体 Y 轴旋转（顺时针/逆时针，无限循环/指定次数）。
 - 支持十六进制颜色中的透明度。
 - 支持指令修改后即时同步到客户端。
 - 支持数据持久化保存到世界存档。
@@ -150,19 +151,25 @@
 ### 区域静态模式
 
 ```mcfunction
-/dyeing area add static <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> [缩放]
+/dyeing area add static <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> [缩放] [rotation_period [rotation_mode]]
 ```
 
 示例：
 
 ```mcfunction
 /dyeing area add static 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 66FFAAFF
+/dyeing area add static 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 66FFAAFF 1.0 40 -1
 ```
+
+说明：
+
+- `rotation_period`：可选，默认 `0`（关闭旋转）。正数=顺时针旋转一圈的 tick 数；负数=逆时针旋转一圈的 tick 数。
+- `rotation_mode`：可选，默认 `-1`（无限循环）。`-1`=无限旋转；正数=旋转指定次数后停止。
 
 ### 区域缩放动画
 
 ```mcfunction
-/dyeing area add scale <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period> [play_count [end_action]]
+/dyeing area add scale <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period> [play_count [end_action]] [rotation_period [rotation_mode]]
 ```
 
 示例：
@@ -170,17 +177,20 @@
 ```mcfunction
 /dyeing area add scale 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40
 /dyeing area add scale 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40 3 remove
+/dyeing area add scale 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40 3 remove -20 5
 ```
 
 说明：
 
 - `play_count`：可选，默认 `-1`。
 - `end_action`：可选，默认 `end`，可选值为 `start`、`end`、`remove`。
+- `rotation_period`：可选，默认 `0`（关闭）。正数顺时针，负数逆时针。
+- `rotation_mode`：可选，默认 `-1`（无限）。正数为指定旋转次数。
 
 ### 区域颜色渐变
 
 ```mcfunction
-/dyeing area add color <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale> <period> [play_count [end_action]]
+/dyeing area add color <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale> <period> [play_count [end_action]] [rotation_period [rotation_mode]]
 ```
 
 示例：
@@ -188,17 +198,20 @@
 ```mcfunction
 /dyeing area add color 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60
 /dyeing area add color 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60 4 start
+/dyeing area add color 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60 4 start 30 -1
 ```
 
 说明：
 
 - `play_count`：可选，默认 `-1`。
 - `end_action`：可选，默认 `end`，可选值为 `start`、`end`、`remove`。
+- `rotation_period`：可选，默认 `0`（关闭）。正数顺时针，负数逆时针。
+- `rotation_mode`：可选，默认 `-1`（无限）。正数为指定旋转次数。
 
 ### 区域组合动画
 
 ```mcfunction
-/dyeing area add combo <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period> [scale_play_count [scale_end_action [color_play_count [color_end_action]]]]
+/dyeing area add combo <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period> [scale_play_count [scale_end_action [color_play_count [color_end_action]]]] [rotation_period [rotation_mode]]
 ```
 
 示例：
@@ -206,6 +219,7 @@
 ```mcfunction
 /dyeing area add combo 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
 /dyeing area add combo 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 3 end 1 remove
+/dyeing area add combo 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 3 end 1 remove -40 3
 ```
 
 说明：
@@ -214,6 +228,8 @@
 - `scale_end_action`：可选，默认 `end`。
 - `color_play_count`：可选，默认 `-1`。
 - `color_end_action`：可选，默认 `end`。
+- `rotation_period`：可选，默认 `0`（关闭）。正数顺时针，负数逆时针。
+- `rotation_mode`：可选，默认 `-1`（无限）。正数为指定旋转次数。
 
 ### 移除区域油漆
 

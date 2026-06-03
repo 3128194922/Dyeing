@@ -5,6 +5,7 @@ import com.example.dyeing.data.AreaPaintData;
 import com.example.dyeing.data.PaintRenderState;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -67,6 +68,36 @@ public final class AreaPaintRenderer {
             double y2 = originY + areaPaintData.toY() * scale;
             double z2 = originZ + areaPaintData.toZ() * scale;
 
+            int rotationPeriod = areaPaintData.rotationPeriod();
+            boolean hasRotation = rotationPeriod != 0;
+            if (hasRotation) {
+                double currentGameTime = entity.level().getGameTime() + partialTick;
+                double animationTime = currentGameTime - areaPaintData.paintData().startGameTime();
+                int period = Math.abs(rotationPeriod);
+                int rotationMode = areaPaintData.rotationMode();
+                double angle;
+
+                if (rotationMode > 0) {
+                    double totalDuration = (double) period * rotationMode;
+                    if (animationTime >= totalDuration) {
+                        angle = rotationMode * 2.0 * Math.PI;
+                    } else {
+                        angle = animationTime / period * 2.0 * Math.PI;
+                    }
+                } else {
+                    angle = animationTime / period * 2.0 * Math.PI;
+                }
+
+                if (rotationPeriod < 0) {
+                    angle = -angle;
+                }
+
+                poseStack.pushPose();
+                poseStack.translate(originX, originY, originZ);
+                poseStack.mulPose(Axis.YP.rotation((float) angle));
+                poseStack.translate(-originX, -originY, -originZ);
+            }
+
             drawCuboidSurface(
                     poseStack,
                     consumer,
@@ -78,6 +109,10 @@ public final class AreaPaintRenderer {
                     Math.max(z1, z2),
                     renderState
             );
+
+            if (hasRotation) {
+                poseStack.popPose();
+            }
         }
 
         poseStack.popPose();

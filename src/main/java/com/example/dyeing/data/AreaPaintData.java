@@ -12,7 +12,9 @@ public record AreaPaintData(
         float toX,
         float toY,
         float toZ,
-        PaintData paintData
+        PaintData paintData,
+        int rotationPeriod,
+        int rotationMode
 ) {
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
@@ -24,6 +26,8 @@ public record AreaPaintData(
         tag.putFloat("ToY", this.toY);
         tag.putFloat("ToZ", this.toZ);
         tag.put("Paint", this.paintData.save());
+        tag.putInt("RotationPeriod", this.rotationPeriod);
+        tag.putInt("RotationMode", this.rotationMode);
         return tag;
     }
 
@@ -36,7 +40,9 @@ public record AreaPaintData(
                 tag.getFloat("ToX"),
                 tag.getFloat("ToY"),
                 tag.getFloat("ToZ"),
-                PaintData.load(tag.getCompound("Paint"))
+                PaintData.load(tag.getCompound("Paint")),
+                tag.contains("RotationPeriod") ? tag.getInt("RotationPeriod") : 0,
+                tag.contains("RotationMode") ? tag.getInt("RotationMode") : -1
         );
     }
 }
