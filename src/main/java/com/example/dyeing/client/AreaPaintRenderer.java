@@ -19,6 +19,8 @@ import net.minecraftforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
+import java.util.Map;
+
 public final class AreaPaintRenderer {
     private static final ResourceLocation WHITE_TEXTURE = ResourceLocation.fromNamespaceAndPath(DyeingMod.MODID, "textures/misc/white.png");
     private static final double SURFACE_EPSILON = 0.001D;
@@ -45,73 +47,76 @@ public final class AreaPaintRenderer {
         poseStack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
         float partialTick = event.getPartialTick();
-        for (AreaPaintData areaPaintData : ClientPaintManager.getAreaEntries().values()) {
-            Entity entity = findEntity(minecraft, areaPaintData.entityUuid());
+        for (Map.Entry<java.util.UUID, Map<String, AreaPaintData>> entityEntry : ClientPaintManager.getAreaEntries().entrySet()) {
+            java.util.UUID entityUuid = entityEntry.getKey();
+            Entity entity = findEntity(minecraft, entityUuid);
             if (entity == null || !entity.isAlive()) {
                 continue;
             }
 
-            PaintRenderState renderState = areaPaintData.paintData().resolve(entity.level().getGameTime() + partialTick);
-            if (renderState.alpha() <= 0.0F) {
-                continue;
-            }
+            for (AreaPaintData areaPaintData : entityEntry.getValue().values()) {
+                PaintRenderState renderState = areaPaintData.paintData().resolve(entity.level().getGameTime() + partialTick);
+                if (renderState.alpha() <= 0.0F) {
+                    continue;
+                }
 
-            double originX = Mth.lerp(partialTick, entity.xo, entity.getX()) + renderState.offsetX();
-            double originY = Mth.lerp(partialTick, entity.yo, entity.getY()) + renderState.offsetY();
-            double originZ = Mth.lerp(partialTick, entity.zo, entity.getZ()) + renderState.offsetZ();
+                double originX = Mth.lerp(partialTick, entity.xo, entity.getX()) + renderState.offsetX();
+                double originY = Mth.lerp(partialTick, entity.yo, entity.getY()) + renderState.offsetY();
+                double originZ = Mth.lerp(partialTick, entity.zo, entity.getZ()) + renderState.offsetZ();
 
-            float scale = renderState.scale();
-            double x1 = originX + areaPaintData.fromX() * scale;
-            double y1 = originY + areaPaintData.fromY() * scale;
-            double z1 = originZ + areaPaintData.fromZ() * scale;
-            double x2 = originX + areaPaintData.toX() * scale;
-            double y2 = originY + areaPaintData.toY() * scale;
-            double z2 = originZ + areaPaintData.toZ() * scale;
+                float scale = renderState.scale();
+                double x1 = originX + areaPaintData.fromX() * scale;
+                double y1 = originY + areaPaintData.fromY() * scale;
+                double z1 = originZ + areaPaintData.fromZ() * scale;
+                double x2 = originX + areaPaintData.toX() * scale;
+                double y2 = originY + areaPaintData.toY() * scale;
+                double z2 = originZ + areaPaintData.toZ() * scale;
 
-            int rotationPeriod = areaPaintData.rotationPeriod();
-            boolean hasRotation = rotationPeriod != 0;
-            if (hasRotation) {
-                double currentGameTime = entity.level().getGameTime() + partialTick;
-                double animationTime = currentGameTime - areaPaintData.paintData().startGameTime();
-                int period = Math.abs(rotationPeriod);
-                int rotationMode = areaPaintData.rotationMode();
-                double angle;
+                int rotationPeriod = areaPaintData.rotationPeriod();
+                boolean hasRotation = rotationPeriod != 0;
+                if (hasRotation) {
+                    double currentGameTime = entity.level().getGameTime() + partialTick;
+                    double animationTime = currentGameTime - areaPaintData.paintData().startGameTime();
+                    int period = Math.abs(rotationPeriod);
+                    int rotationMode = areaPaintData.rotationMode();
+                    double angle;
 
-                if (rotationMode > 0) {
-                    double totalDuration = (double) period * rotationMode;
-                    if (animationTime >= totalDuration) {
-                        angle = rotationMode * 2.0 * Math.PI;
+                    if (rotationMode > 0) {
+                        double totalDuration = (double) period * rotationMode;
+                        if (animationTime >= totalDuration) {
+                            angle = rotationMode * 2.0 * Math.PI;
+                        } else {
+                            angle = animationTime / period * 2.0 * Math.PI;
+                        }
                     } else {
                         angle = animationTime / period * 2.0 * Math.PI;
                     }
-                } else {
-                    angle = animationTime / period * 2.0 * Math.PI;
+
+                    if (rotationPeriod < 0) {
+                        angle = -angle;
+                    }
+
+                    poseStack.pushPose();
+                    poseStack.translate(originX, originY, originZ);
+                    poseStack.mulPose(Axis.YP.rotation((float) angle));
+                    poseStack.translate(-originX, -originY, -originZ);
                 }
 
-                if (rotationPeriod < 0) {
-                    angle = -angle;
+                drawCuboidSurface(
+                        poseStack,
+                        consumer,
+                        Math.min(x1, x2),
+                        Math.min(y1, y2),
+                        Math.min(z1, z2),
+                        Math.max(x1, x2),
+                        Math.max(y1, y2),
+                        Math.max(z1, z2),
+                        renderState
+                );
+
+                if (hasRotation) {
+                    poseStack.popPose();
                 }
-
-                poseStack.pushPose();
-                poseStack.translate(originX, originY, originZ);
-                poseStack.mulPose(Axis.YP.rotation((float) angle));
-                poseStack.translate(-originX, -originY, -originZ);
-            }
-
-            drawCuboidSurface(
-                    poseStack,
-                    consumer,
-                    Math.min(x1, x2),
-                    Math.min(y1, y2),
-                    Math.min(z1, z2),
-                    Math.max(x1, x2),
-                    Math.max(y1, y2),
-                    Math.max(z1, z2),
-                    renderState
-            );
-
-            if (hasRotation) {
-                poseStack.popPose();
             }
         }
 

@@ -13,6 +13,8 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 
+import java.util.Map;
+
 public class PaintRenderLayer<T extends LivingEntity, M extends EntityModel<T>> extends RenderLayer<T, M> {
     private static final ResourceLocation WHITE_TEXTURE = ResourceLocation.fromNamespaceAndPath(DyeingMod.MODID, "textures/misc/white.png");
 
@@ -33,34 +35,40 @@ public class PaintRenderLayer<T extends LivingEntity, M extends EntityModel<T>> 
             float netHeadYaw,
             float headPitch
     ) {
-        PaintData paintData = ClientPaintManager.get(entity.getUUID());
-        if (paintData == null || entity.isInvisible()) {
+        if (entity.isInvisible()) {
             return;
         }
 
-        PaintRenderState renderState = paintData.resolve(entity.level().getGameTime() + partialTick);
-        if (renderState.alpha() <= 0.0F) {
+        Map<String, PaintData> paints = ClientPaintManager.getAllPaints(entity.getUUID());
+        if (paints.isEmpty()) {
             return;
         }
 
-        poseStack.pushPose();
-        if (renderState.offsetX() != 0.0F || renderState.offsetY() != 0.0F || renderState.offsetZ() != 0.0F) {
-            poseStack.translate(renderState.offsetX(), renderState.offsetY(), renderState.offsetZ());
-        }
-        if (renderState.scale() != 1.0F) {
-            poseStack.scale(renderState.scale(), renderState.scale(), renderState.scale());
-        }
+        for (PaintData paintData : paints.values()) {
+            PaintRenderState renderState = paintData.resolve(entity.level().getGameTime() + partialTick);
+            if (renderState.alpha() <= 0.0F) {
+                continue;
+            }
 
-        this.getParentModel().renderToBuffer(
-                poseStack,
-                buffer.getBuffer(RenderType.entityTranslucent(WHITE_TEXTURE)),
-                packedLight,
-                LivingEntityRenderer.getOverlayCoords(entity, 0.0F),
-                renderState.red(),
-                renderState.green(),
-                renderState.blue(),
-                renderState.alpha()
-        );
-        poseStack.popPose();
+            poseStack.pushPose();
+            if (renderState.offsetX() != 0.0F || renderState.offsetY() != 0.0F || renderState.offsetZ() != 0.0F) {
+                poseStack.translate(renderState.offsetX(), renderState.offsetY(), renderState.offsetZ());
+            }
+            if (renderState.scale() != 1.0F) {
+                poseStack.scale(renderState.scale(), renderState.scale(), renderState.scale());
+            }
+
+            this.getParentModel().renderToBuffer(
+                    poseStack,
+                    buffer.getBuffer(RenderType.entityTranslucent(WHITE_TEXTURE)),
+                    packedLight,
+                    LivingEntityRenderer.getOverlayCoords(entity, 0.0F),
+                    renderState.red(),
+                    renderState.green(),
+                    renderState.blue(),
+                    renderState.alpha()
+            );
+            poseStack.popPose();
+        }
     }
 }

@@ -30,6 +30,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Mod(DyeingMod.MODID)
@@ -60,36 +61,46 @@ public class DyeingMod {
         DyeingNetwork.sendFullAreaSync(player, getAreaPaintData(player.server).getEntries());
     }
 
-    public static void broadcastUpdate(UUID entityUuid, PaintData paintData) {
-        DyeingNetwork.broadcastUpdate(entityUuid, paintData);
+    public static void broadcastUpdate(UUID entityUuid, String id, PaintData paintData) {
+        DyeingNetwork.broadcastUpdate(entityUuid, id, paintData);
     }
 
-    public static void broadcastRemove(UUID entityUuid) {
-        DyeingNetwork.broadcastRemove(entityUuid);
+    public static void broadcastRemove(UUID entityUuid, String id) {
+        DyeingNetwork.broadcastRemove(entityUuid, id);
     }
 
-    public static void broadcastAreaUpdate(UUID entityUuid, AreaPaintData areaPaintData) {
-        DyeingNetwork.broadcastAreaUpdate(entityUuid, areaPaintData);
+    public static void broadcastAreaUpdate(UUID entityUuid, String id, AreaPaintData areaPaintData) {
+        DyeingNetwork.broadcastAreaUpdate(entityUuid, id, areaPaintData);
     }
 
-    public static void broadcastAreaRemove(UUID entityUuid) {
-        DyeingNetwork.broadcastAreaRemove(entityUuid);
+    public static void broadcastAreaRemove(UUID entityUuid, String id) {
+        DyeingNetwork.broadcastAreaRemove(entityUuid, id);
     }
 
     public static void cleanupFinishedAnimations(net.minecraft.server.MinecraftServer server) {
         long currentGameTime = server.overworld().getGameTime();
 
-        for (UUID entityUuid : getPaintData(server).getEntries().keySet()) {
-            PaintData paintData = getPaintData(server).getEntries().get(entityUuid);
-            if (paintData != null && paintData.shouldAutoRemove(currentGameTime) && getPaintData(server).remove(entityUuid)) {
-                broadcastRemove(entityUuid);
+        for (Map.Entry<UUID, Map<String, PaintData>> entityEntry : getPaintData(server).getEntries().entrySet()) {
+            UUID entityUuid = entityEntry.getKey();
+            for (Map.Entry<String, PaintData> paintEntry : entityEntry.getValue().entrySet()) {
+                String id = paintEntry.getKey();
+                PaintData paintData = paintEntry.getValue();
+                if (paintData.shouldAutoRemove(currentGameTime)) {
+                    getPaintData(server).remove(entityUuid, id);
+                    broadcastRemove(entityUuid, id);
+                }
             }
         }
 
-        for (UUID entityUuid : getAreaPaintData(server).getEntries().keySet()) {
-            AreaPaintData areaPaintData = getAreaPaintData(server).getEntries().get(entityUuid);
-            if (areaPaintData != null && areaPaintData.paintData().shouldAutoRemove(currentGameTime) && getAreaPaintData(server).remove(entityUuid)) {
-                broadcastAreaRemove(entityUuid);
+        for (Map.Entry<UUID, Map<String, AreaPaintData>> entityEntry : getAreaPaintData(server).getEntries().entrySet()) {
+            UUID entityUuid = entityEntry.getKey();
+            for (Map.Entry<String, AreaPaintData> areaEntry : entityEntry.getValue().entrySet()) {
+                String id = areaEntry.getKey();
+                AreaPaintData areaPaintData = areaEntry.getValue();
+                if (areaPaintData.paintData().shouldAutoRemove(currentGameTime)) {
+                    getAreaPaintData(server).remove(entityUuid, id);
+                    broadcastAreaRemove(entityUuid, id);
+                }
             }
         }
     }

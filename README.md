@@ -4,7 +4,7 @@
 
 ## 功能说明
 
-- 支持为生物实体添加一层覆盖原模型动作的油漆层。
+- 支持为生物实体添加一层覆盖原模型动作的油漆层，同一实体可添加多层（通过 `id` 区分）。
 - 支持静态颜色与静态缩放。
 - 支持每种油漆层单独设置 XYZ 三轴偏移。
 - 支持缩放动画。
@@ -12,7 +12,7 @@
 - 支持同时启用缩放动画和颜色渐变。
 - 支持为所有动画设置播放次数，默认 `-1` 表示无限循环。
 - 支持为所有动画设置播放结束行为：回到起点、停在终点、自动移除。
-- 支持绑定实体并渲染随实体移动的长方体区域表面油漆。
+- 支持绑定实体并渲染随实体移动的长方体区域表面油漆，同一实体可绑定多个区域（通过 `id` 区分）。
 - 支持区域绕实体 Y 轴旋转（顺时针/逆时针，无限循环/指定次数）。
 - 支持十六进制颜色中的透明度。
 - 支持指令修改后即时同步到客户端。
@@ -32,25 +32,27 @@
 
 - 现在只保留一个根指令：`/dyeing`。
 - `/dyeing paint add` 下支持 `static`、`scale`、`color`、`combo` 四个补全选项。
-- 新增 `/dyeing area add ...` 与 `/dyeing area remove ...` 用于区域表面油漆。
-- `/dyeing paint remove` 用于移除实体模型油漆层。
-- `/dyeing remove all` 用于同时移除油漆层和区域油漆。
+- 所有 `add` 命令第一个参数为 `id`（String 类型），作为该油漆层的唯一标识。
+- `/dyeing area add ...` 与 `/dyeing area remove ...` 用于区域表面油漆。
+- `/dyeing paint remove <实体UUID> <id>` 用于按 id 移除实体模型油漆层。
+- `/dyeing area remove <实体UUID> <id>` 用于按 id 移除区域油漆。
 
 ## 静态油漆层
 
 ```mcfunction
-/dyeing paint add static <实体UUID> <十六进制颜色> [缩放] [offset_x offset_y offset_z]
+/dyeing paint add static <id> <实体UUID> <十六进制颜色> [缩放] [offset_x offset_y offset_z]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing paint add static 123e4567-e89b-12d3-a456-426614174000 FF00FF00
-/dyeing paint add static 123e4567-e89b-12d3-a456-426614174000 80FF0000 1.2
+/dyeing paint add static layer1 123e4567-e89b-12d3-a456-426614174000 FF00FF00
+/dyeing paint add static layer2 123e4567-e89b-12d3-a456-426614174000 80FF0000 1.2
 ```
 
 说明：
 
+- `id`：该油漆层的唯一标识字符串，同一个实体可以有多个不同 id 的油漆层。
 - `实体UUID`：目标生物实体的 UUID。
 - `十六进制颜色`：支持 `RRGGBB`、`AARRGGBB`、`#RRGGBB`、`0xAARRGGBB`。
 - `缩放`：可选，默认 `1.0`。
@@ -59,18 +61,19 @@
 ## 缩放动画
 
 ```mcfunction
-/dyeing paint add scale <实体UUID> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period> [offset_x offset_y offset_z] [play_count [end_action]]
+/dyeing paint add scale <id> <实体UUID> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period> [offset_x offset_y offset_z] [play_count [end_action]]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing paint add scale 123e4567-e89b-12d3-a456-426614174000 FFFF0000 0.8 1.4 0.2 1.0 40
-/dyeing paint add scale 123e4567-e89b-12d3-a456-426614174000 FFFF0000 0.8 1.4 0.2 1.0 40 1.0 0.0 0.0 3 remove
+/dyeing paint add scale pulse 123e4567-e89b-12d3-a456-426614174000 FFFF0000 0.8 1.4 0.2 1.0 40
+/dyeing paint add scale pulse2 123e4567-e89b-12d3-a456-426614174000 FFFF0000 0.8 1.4 0.2 1.0 40 1.0 0.0 0.0 3 remove
 ```
 
 说明：
 
+- `id`：该油漆层的唯一标识字符串。
 - `十六进制颜色`：缩放动画期间使用的基础颜色。
 - `scale_from`：动画起点缩放。
 - `scale_to`：动画终点缩放。
@@ -84,18 +87,19 @@
 ## 颜色渐变动画
 
 ```mcfunction
-/dyeing paint add color <实体UUID> <color_from> <color_to> <scale> <period> [offset_x offset_y offset_z] [play_count [end_action]]
+/dyeing paint add color <id> <实体UUID> <color_from> <color_to> <scale> <period> [offset_x offset_y offset_z] [play_count [end_action]]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing paint add color 123e4567-e89b-12d3-a456-426614174000 40FF0000 C00000FF 1.0 60
-/dyeing paint add color 123e4567-e89b-12d3-a456-426614174000 40FF0000 C00000FF 1.0 60 2 end
+/dyeing paint add color fade 123e4567-e89b-12d3-a456-426614174000 40FF0000 C00000FF 1.0 60
+/dyeing paint add color fade2 123e4567-e89b-12d3-a456-426614174000 40FF0000 C00000FF 1.0 60 2 end
 ```
 
 说明：
 
+- `id`：该油漆层的唯一标识字符串。
 - `color_from`：起点颜色。
 - `color_to`：终点颜色。
 - `scale`：颜色变化期间使用的固定缩放。
@@ -111,18 +115,19 @@
 ## 组合动画
 
 ```mcfunction
-/dyeing paint add combo <实体UUID> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period> [offset_x offset_y offset_z] [scale_play_count [scale_end_action [color_play_count [color_end_action]]]]
+/dyeing paint add combo <id> <实体UUID> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period> [offset_x offset_y offset_z] [scale_play_count [scale_end_action [color_play_count [color_end_action]]]]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing paint add combo 123e4567-e89b-12d3-a456-426614174000 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
-/dyeing paint add combo 123e4567-e89b-12d3-a456-426614174000 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 5 end 2 remove
+/dyeing paint add combo both 123e4567-e89b-12d3-a456-426614174000 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
+/dyeing paint add combo both2 123e4567-e89b-12d3-a456-426614174000 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 5 end 2 remove
 ```
 
 说明：
 
+- `id`：该油漆层的唯一标识字符串。
 - 同时启用缩放动画与颜色渐变动画。
 - `scale_period` 与 `color_period` 可分别设置。
 - `offset_x offset_y offset_z`：可选，默认 `0 0 0`。
@@ -144,44 +149,46 @@
 
 - 区域会实时跟随绑定实体移动。
 - `scale` 语义为整体放缩，会同时缩放 `from/to` 两组偏移。
-- 当前实现为每个绑定实体最多保存一个区域表面油漆。
-- 区域命令的参数顺序固定为：`实体UUID -> from_x/y/z -> to_x/y/z -> 颜色或动画参数`。
+- 同一实体可以绑定多个区域表面油漆（通过 `id` 区分）。
+- 区域命令的参数顺序固定为：`id -> 实体UUID -> from_x/y/z -> to_x/y/z -> 颜色或动画参数`。
 - 为减少区域表面闪烁，区域 6 个外表面现在会做极小外扩，并避免同一平面重复绘制。
 
 ### 区域静态模式
 
 ```mcfunction
-/dyeing area add static <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> [缩放] [rotation_period [rotation_mode]]
+/dyeing area add static <id> <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> [缩放] [rotation_period [rotation_mode]]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing area add static 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 66FFAAFF
-/dyeing area add static 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 66FFAAFF 1.0 40 -1
+/dyeing area add static box1 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 66FFAAFF
+/dyeing area add static box1 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 66FFAAFF 1.0 40 -1
 ```
 
 说明：
 
+- `id`：该区域油漆的唯一标识字符串。
 - `rotation_period`：可选，默认 `0`（关闭旋转）。正数=顺时针旋转一圈的 tick 数；负数=逆时针旋转一圈的 tick 数。
 - `rotation_mode`：可选，默认 `-1`（无限循环）。`-1`=无限旋转；正数=旋转指定次数后停止。
 
 ### 区域缩放动画
 
 ```mcfunction
-/dyeing area add scale <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period> [play_count [end_action]] [rotation_period [rotation_mode]]
+/dyeing area add scale <id> <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <十六进制颜色> <scale_from> <scale_to> <alpha_from> <alpha_to> <period> [play_count [end_action]] [rotation_period [rotation_mode]]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing area add scale 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40
-/dyeing area add scale 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40 3 remove
-/dyeing area add scale 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40 3 remove -20 5
+/dyeing area add scale pulse 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40
+/dyeing area add scale pulse2 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40 3 remove
+/dyeing area add scale pulse3 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 88FF0000 0.8 1.2 0.2 0.9 40 3 remove -20 5
 ```
 
 说明：
 
+- `id`：该区域油漆的唯一标识字符串。
 - `play_count`：可选，默认 `-1`。
 - `end_action`：可选，默认 `end`，可选值为 `start`、`end`、`remove`。
 - `rotation_period`：可选，默认 `0`（关闭）。正数顺时针，负数逆时针。
@@ -190,19 +197,20 @@
 ### 区域颜色渐变
 
 ```mcfunction
-/dyeing area add color <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale> <period> [play_count [end_action]] [rotation_period [rotation_mode]]
+/dyeing area add color <id> <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale> <period> [play_count [end_action]] [rotation_period [rotation_mode]]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing area add color 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60
-/dyeing area add color 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60 4 start
-/dyeing area add color 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60 4 start 30 -1
+/dyeing area add color fade 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60
+/dyeing area add color fade2 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60 4 start
+/dyeing area add color fade3 123e4567-e89b-12d3-a456-426614174000 -2 0 -2 2 3 2 30FF0000 B00000FF 1.0 60 4 start 30 -1
 ```
 
 说明：
 
+- `id`：该区域油漆的唯一标识字符串。
 - `play_count`：可选，默认 `-1`。
 - `end_action`：可选，默认 `end`，可选值为 `start`、`end`、`remove`。
 - `rotation_period`：可选，默认 `0`（关闭）。正数顺时针，负数逆时针。
@@ -211,19 +219,20 @@
 ### 区域组合动画
 
 ```mcfunction
-/dyeing area add combo <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period> [scale_play_count [scale_end_action [color_play_count [color_end_action]]]] [rotation_period [rotation_mode]]
+/dyeing area add combo <id> <实体UUID> <from_x> <from_y> <from_z> <to_x> <to_y> <to_z> <color_from> <color_to> <scale_from> <scale_to> <alpha_from> <alpha_to> <scale_period> <color_period> [scale_play_count [scale_end_action [color_play_count [color_end_action]]]] [rotation_period [rotation_mode]]
 ```
 
 示例：
 
 ```mcfunction
-/dyeing area add combo 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
-/dyeing area add combo 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 3 end 1 remove
-/dyeing area add combo 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 3 end 1 remove -40 3
+/dyeing area add combo both 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80
+/dyeing area add combo both2 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 3 end 1 remove
+/dyeing area add combo both3 123e4567-e89b-12d3-a456-426614174000 -1 0 -1 1 2 1 20FFAA00 E000AAFF 0.7 1.4 0.3 1.0 30 80 3 end 1 remove -40 3
 ```
 
 说明：
 
+- `id`：该区域油漆的唯一标识字符串。
 - `scale_play_count`：可选，默认 `-1`。
 - `scale_end_action`：可选，默认 `end`。
 - `color_play_count`：可选，默认 `-1`。
@@ -231,51 +240,33 @@
 - `rotation_period`：可选，默认 `0`（关闭）。正数顺时针，负数逆时针。
 - `rotation_mode`：可选，默认 `-1`（无限）。正数为指定旋转次数。
 
-### 移除区域油漆
-
-```mcfunction
-/dyeing area remove <实体UUID>
-```
-
-示例：
-
-```mcfunction
-/dyeing area remove 123e4567-e89b-12d3-a456-426614174000
-```
-
 ## 移除油漆层
 
 ```mcfunction
-/dyeing paint remove <实体UUID>
+/dyeing paint remove <实体UUID> <id>
 ```
 
 示例：
 
 ```mcfunction
-/dyeing paint remove 123e4567-e89b-12d3-a456-426614174000
+/dyeing paint remove 123e4567-e89b-12d3-a456-426614174000 layer1
 ```
 
-## 移除全部
+## 移除区域油漆
 
 ```mcfunction
-/dyeing remove all <实体UUID>
+/dyeing area remove <实体UUID> <id>
 ```
 
 示例：
 
 ```mcfunction
-/dyeing remove all 123e4567-e89b-12d3-a456-426614174000
+/dyeing area remove 123e4567-e89b-12d3-a456-426614174000 box1
 ```
-
-## 移除区域或全部说明
-
-- `/dyeing paint remove <实体UUID>`：仅移除实体模型表面的油漆层。
-- `/dyeing area remove <实体UUID>`：仅移除绑定实体的区域表面油漆。
-- `/dyeing remove all <实体UUID>`：同时移除油漆层和区域表面油漆。
 
 ## 动画规则
 
-- 当前动画模式为“单向循环”。
+- 当前动画模式为"单向循环"。
 - 每个周期内按照 `A -> B` 平滑过渡。
 - 无限播放时，到达周期末尾后会瞬间回到 `A`，然后开始下一轮。
 - `A` 和 `B` 任意一边都可以更大或更小。

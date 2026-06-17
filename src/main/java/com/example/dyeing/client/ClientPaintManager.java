@@ -10,44 +10,76 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ClientPaintManager {
-    private static final Map<UUID, PaintData> ENTRIES = new ConcurrentHashMap<>();
-    private static final Map<UUID, AreaPaintData> AREA_ENTRIES = new ConcurrentHashMap<>();
+    private static final Map<UUID, Map<String, PaintData>> ENTRIES = new ConcurrentHashMap<>();
+    private static final Map<UUID, Map<String, AreaPaintData>> AREA_ENTRIES = new ConcurrentHashMap<>();
 
     private ClientPaintManager() {
     }
 
-    public static PaintData get(UUID entityUuid) {
-        return ENTRIES.get(entityUuid);
+    public static Map<String, PaintData> getAllPaints(UUID entityUuid) {
+        Map<String, PaintData> paints = ENTRIES.get(entityUuid);
+        if (paints == null) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(paints);
     }
 
-    public static void put(UUID entityUuid, PaintData paintData) {
-        ENTRIES.put(entityUuid, paintData);
+    public static void put(UUID entityUuid, String id, PaintData paintData) {
+        ENTRIES.computeIfAbsent(entityUuid, k -> new ConcurrentHashMap<>()).put(id, paintData);
     }
 
-    public static void remove(UUID entityUuid) {
-        ENTRIES.remove(entityUuid);
+    public static void remove(UUID entityUuid, String id) {
+        Map<String, PaintData> paints = ENTRIES.get(entityUuid);
+        if (paints != null) {
+            paints.remove(id);
+            if (paints.isEmpty()) {
+                ENTRIES.remove(entityUuid);
+            }
+        }
     }
 
-    public static void replaceAll(Map<UUID, PaintData> entries) {
+    public static void replaceAll(Map<UUID, Map<String, PaintData>> entries) {
         ENTRIES.clear();
-        ENTRIES.putAll(new HashMap<>(entries));
+        for (Map.Entry<UUID, Map<String, PaintData>> entityEntry : entries.entrySet()) {
+            ENTRIES.put(entityEntry.getKey(), new ConcurrentHashMap<>(entityEntry.getValue()));
+        }
     }
 
-    public static Map<UUID, AreaPaintData> getAreaEntries() {
-        return Collections.unmodifiableMap(AREA_ENTRIES);
+    public static Map<UUID, Map<String, AreaPaintData>> getAreaEntries() {
+        Map<UUID, Map<String, AreaPaintData>> copy = new HashMap<>();
+        for (Map.Entry<UUID, Map<String, AreaPaintData>> entry : AREA_ENTRIES.entrySet()) {
+            copy.put(entry.getKey(), new HashMap<>(entry.getValue()));
+        }
+        return Collections.unmodifiableMap(copy);
     }
 
-    public static void putArea(UUID entityUuid, AreaPaintData areaPaintData) {
-        AREA_ENTRIES.put(entityUuid, areaPaintData);
+    public static Map<String, AreaPaintData> getAllAreas(UUID entityUuid) {
+        Map<String, AreaPaintData> areas = AREA_ENTRIES.get(entityUuid);
+        if (areas == null) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(areas);
     }
 
-    public static void removeArea(UUID entityUuid) {
-        AREA_ENTRIES.remove(entityUuid);
+    public static void putArea(UUID entityUuid, String id, AreaPaintData areaPaintData) {
+        AREA_ENTRIES.computeIfAbsent(entityUuid, k -> new ConcurrentHashMap<>()).put(id, areaPaintData);
     }
 
-    public static void replaceAllAreas(Map<UUID, AreaPaintData> entries) {
+    public static void removeArea(UUID entityUuid, String id) {
+        Map<String, AreaPaintData> areas = AREA_ENTRIES.get(entityUuid);
+        if (areas != null) {
+            areas.remove(id);
+            if (areas.isEmpty()) {
+                AREA_ENTRIES.remove(entityUuid);
+            }
+        }
+    }
+
+    public static void replaceAllAreas(Map<UUID, Map<String, AreaPaintData>> entries) {
         AREA_ENTRIES.clear();
-        AREA_ENTRIES.putAll(new HashMap<>(entries));
+        for (Map.Entry<UUID, Map<String, AreaPaintData>> entityEntry : entries.entrySet()) {
+            AREA_ENTRIES.put(entityEntry.getKey(), new ConcurrentHashMap<>(entityEntry.getValue()));
+        }
     }
 
     public static void clear() {

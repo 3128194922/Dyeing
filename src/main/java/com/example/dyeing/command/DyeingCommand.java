@@ -34,10 +34,10 @@ public final class DyeingCommand {
             Component.literal("找不到对应的已加载实体")
     );
     private static final SimpleCommandExceptionType NO_PAINT_DATA = new SimpleCommandExceptionType(
-            Component.literal("该 UUID 没有已保存的染色数据")
+            Component.literal("该 UUID/ID 没有已保存的染色数据")
     );
     private static final SimpleCommandExceptionType NO_AREA_PAINT_DATA = new SimpleCommandExceptionType(
-            Component.literal("该 UUID 没有已保存的区域油漆数据")
+            Component.literal("该 UUID/ID 没有已保存的区域油漆数据")
     );
     private static final SimpleCommandExceptionType INVALID_PLAY_COUNT = new SimpleCommandExceptionType(
             Component.literal("播放次数只能是 -1 或大于等于 1 的整数")
@@ -57,23 +57,20 @@ public final class DyeingCommand {
         return Commands.literal(name)
                 .requires(source -> source.hasPermission(2))
                 .then(createPaintBranch())
-                .then(createAreaBranch())
-                .then(Commands.literal("remove")
-                        .then(Commands.literal("all")
-                                .then(Commands.argument("entity_uuid", UuidArgument.uuid())
-                                        .executes(DyeingCommand::removeAll))));
+                .then(createAreaBranch());
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createPaintBranch() {
         return Commands.literal("paint")
                 .then(Commands.literal("add")
+                        .then(createStaticAddBranch())
                         .then(createScaleAddBranch())
                         .then(createColorAddBranch())
-                        .then(createComboAddBranch())
-                        .then(createStaticAddBranch()))
+                        .then(createComboAddBranch()))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("entity_uuid", UuidArgument.uuid())
-                                .executes(DyeingCommand::removePaint)));
+                                .then(Commands.argument("id", StringArgumentType.word())
+                                        .executes(DyeingCommand::removePaint))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createAreaBranch() {
@@ -85,62 +82,82 @@ public final class DyeingCommand {
                         .then(createAreaComboAddBranch()))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("entity_uuid", UuidArgument.uuid())
-                                .executes(DyeingCommand::removeArea)));
+                                .then(Commands.argument("id", StringArgumentType.word())
+                                        .executes(DyeingCommand::removeArea))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createStaticAddBranch() {
         return Commands.literal("static")
-                .then(Commands.argument("entity_uuid", UuidArgument.uuid())
-                        .then(Commands.argument("hex_color", StringArgumentType.word())
-                                .executes(context -> addStatic(context, 1.0F))
-                                .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
-                                        .executes(context -> addStatic(context, FloatArgumentType.getFloat(context, "scale")))
-                                        .then(createOffsetArguments(ctx -> addStatic(ctx, FloatArgumentType.getFloat(ctx, "scale")))))
-                                .then(createOffsetArguments(ctx -> addStatic(ctx, 1.0F)))));
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("entity_uuid", UuidArgument.uuid())
+                                .then(Commands.argument("hex_color", StringArgumentType.word())
+                                        .executes(context -> addStatic(context, 1.0F))
+                                        .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
+                                                .executes(context -> addStatic(context, FloatArgumentType.getFloat(context, "scale")))
+                                                .then(createOffsetArguments(ctx -> addStatic(ctx, FloatArgumentType.getFloat(ctx, "scale")))))
+                                        .then(createOffsetArguments(ctx -> addStatic(ctx, 1.0F))))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createScaleAddBranch() {
-        return Commands.literal("scale")
-                .then(Commands.argument("entity_uuid", UuidArgument.uuid())
-                        .then(Commands.argument("hex_color", StringArgumentType.word())
-                                .then(Commands.argument("scale_from", FloatArgumentType.floatArg(0.01F))
-                                        .then(Commands.argument("scale_to", FloatArgumentType.floatArg(0.01F))
-                                                .then(Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F))
-                                                        .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
-                                                                .then(Commands.argument("period", IntegerArgumentType.integer(1))
-                                                                        .executes(DyeingCommand::addScaleAnimation)
-                                                                        .then(createOffsetThenSingleAnimationOptions("play_count", "end_action", DyeingCommand::addScaleAnimation))
-                                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addScaleAnimation))
-                                                        )))))));
+        var idArg = Commands.argument("id", StringArgumentType.word());
+        var entityArg = Commands.argument("entity_uuid", UuidArgument.uuid());
+        var colorArg = Commands.argument("hex_color", StringArgumentType.word());
+        var scaleFromArg = Commands.argument("scale_from", FloatArgumentType.floatArg(0.01F));
+        var scaleToArg = Commands.argument("scale_to", FloatArgumentType.floatArg(0.01F));
+        var alphaFromArg = Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F));
+        var alphaToArg = Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F));
+        var periodArg = Commands.argument("period", IntegerArgumentType.integer(1));
+        periodArg.executes(DyeingCommand::addScaleAnimation);
+        periodArg.then(createOffsetThenSingleAnimationOptions("play_count", "end_action", DyeingCommand::addScaleAnimation));
+        periodArg.then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addScaleAnimation));
+        alphaToArg.then(periodArg);
+        alphaFromArg.then(alphaToArg);
+        scaleToArg.then(alphaFromArg);
+        scaleFromArg.then(scaleToArg);
+        colorArg.then(scaleFromArg);
+        entityArg.then(colorArg);
+        idArg.then(entityArg);
+        return Commands.literal("scale").then(idArg);
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createColorAddBranch() {
         return Commands.literal("color")
-                .then(Commands.argument("entity_uuid", UuidArgument.uuid())
-                        .then(Commands.argument("color_from", StringArgumentType.word())
-                                .then(Commands.argument("color_to", StringArgumentType.word())
-                                        .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
-                                                .then(Commands.argument("period", IntegerArgumentType.integer(1))
-                                                        .executes(DyeingCommand::addColorAnimation)
-                                                        .then(createOffsetThenSingleAnimationOptions("play_count", "end_action", DyeingCommand::addColorAnimation))
-                                                        .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addColorAnimation))
-                                        )))));
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("entity_uuid", UuidArgument.uuid())
+                                .then(Commands.argument("color_from", StringArgumentType.word())
+                                        .then(Commands.argument("color_to", StringArgumentType.word())
+                                                .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
+                                                        .then(Commands.argument("period", IntegerArgumentType.integer(1))
+                                                                .executes(DyeingCommand::addColorAnimation)
+                                                                .then(createOffsetThenSingleAnimationOptions("play_count", "end_action", DyeingCommand::addColorAnimation))
+                                                                .then(createSingleAnimationOptions("play_count", "end_action", DyeingCommand::addColorAnimation))
+                                                ))))));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createComboAddBranch() {
-        return Commands.literal("combo")
-                .then(Commands.argument("entity_uuid", UuidArgument.uuid())
-                        .then(Commands.argument("color_from", StringArgumentType.word())
-                                .then(Commands.argument("color_to", StringArgumentType.word())
-                                        .then(Commands.argument("scale_from", FloatArgumentType.floatArg(0.01F))
-                                                .then(Commands.argument("scale_to", FloatArgumentType.floatArg(0.01F))
-                                                        .then(Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F))
-                                                                .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
-                                                                        .then(Commands.argument("scale_period", IntegerArgumentType.integer(1))
-                                                                                .then(Commands.argument("color_period", IntegerArgumentType.integer(1))
-                                                                                        .executes(DyeingCommand::addCombinedAnimation)
-                                                                                        .then(createOffsetThenComboAnimationOptions(DyeingCommand::addCombinedAnimation))
-                                                                                        .then(createComboAnimationOptions(DyeingCommand::addCombinedAnimation)))))))))));
+        var idArg = Commands.argument("id", StringArgumentType.word());
+        var entityArg = Commands.argument("entity_uuid", UuidArgument.uuid());
+        var colorFromArg = Commands.argument("color_from", StringArgumentType.word());
+        var colorToArg = Commands.argument("color_to", StringArgumentType.word());
+        var scaleFromArg = Commands.argument("scale_from", FloatArgumentType.floatArg(0.01F));
+        var scaleToArg = Commands.argument("scale_to", FloatArgumentType.floatArg(0.01F));
+        var alphaFromArg = Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F));
+        var alphaToArg = Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F));
+        var scalePeriodArg = Commands.argument("scale_period", IntegerArgumentType.integer(1));
+        var colorPeriodArg = Commands.argument("color_period", IntegerArgumentType.integer(1));
+        colorPeriodArg.executes(DyeingCommand::addCombinedAnimation);
+        colorPeriodArg.then(createOffsetThenComboAnimationOptions(DyeingCommand::addCombinedAnimation));
+        colorPeriodArg.then(createComboAnimationOptions(DyeingCommand::addCombinedAnimation));
+        scalePeriodArg.then(colorPeriodArg);
+        alphaToArg.then(scalePeriodArg);
+        alphaFromArg.then(alphaToArg);
+        scaleToArg.then(alphaFromArg);
+        scaleFromArg.then(scaleToArg);
+        colorToArg.then(scaleFromArg);
+        colorFromArg.then(colorToArg);
+        entityArg.then(colorFromArg);
+        idArg.then(entityArg);
+        return Commands.literal("combo").then(idArg);
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createOffsetArguments(Command<CommandSourceStack> command) {
@@ -197,59 +214,63 @@ public final class DyeingCommand {
 
     private static ArgumentBuilder<CommandSourceStack, ?> createAreaStaticAddBranch() {
         return Commands.literal("static")
-                .then(createAreaBoundsArguments(
-                        Commands.argument("hex_color", StringArgumentType.word())
-                                .executes(context -> addAreaStatic(context, 1.0F))
-                                .then(createAreaRotationOptions(context -> addAreaStatic(context, 1.0F)))
-                                .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
-                                        .executes(context -> addAreaStatic(context, FloatArgumentType.getFloat(context, "scale")))
-                                        .then(createAreaRotationOptions(context -> addAreaStatic(context, FloatArgumentType.getFloat(context, "scale")))))
-                ));
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .then(createAreaBoundsArguments(
+                                Commands.argument("hex_color", StringArgumentType.word())
+                                        .executes(context -> addAreaStatic(context, 1.0F))
+                                        .then(createAreaRotationOptions(context -> addAreaStatic(context, 1.0F)))
+                                        .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
+                                                .executes(context -> addAreaStatic(context, FloatArgumentType.getFloat(context, "scale")))
+                                                .then(createAreaRotationOptions(context -> addAreaStatic(context, FloatArgumentType.getFloat(context, "scale")))))
+                        )));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createAreaScaleAddBranch() {
         return Commands.literal("scale")
-                .then(createAreaBoundsArguments(
-                        Commands.argument("hex_color", StringArgumentType.word())
-                                .then(Commands.argument("scale_from", FloatArgumentType.floatArg(0.01F))
-                                        .then(Commands.argument("scale_to", FloatArgumentType.floatArg(0.01F))
-                                                .then(Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F))
-                                                        .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
-                                                                .then(Commands.argument("period", IntegerArgumentType.integer(1))
-                                                                        .executes(DyeingCommand::addAreaScaleAnimation)
-                                                                        .then(createAreaRotationOptions(DyeingCommand::addAreaScaleAnimation))
-                                                                        .then(createAreaSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaScaleAnimation))))))))
-                );
-    }
-
-    private static ArgumentBuilder<CommandSourceStack, ?> createAreaColorAddBranch() {
-        return Commands.literal("color")
-                .then(createAreaBoundsArguments(
-                        Commands.argument("color_from", StringArgumentType.word())
-                                .then(Commands.argument("color_to", StringArgumentType.word())
-                                        .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
-                                                .then(Commands.argument("period", IntegerArgumentType.integer(1))
-                                                        .executes(DyeingCommand::addAreaColorAnimation)
-                                                        .then(createAreaRotationOptions(DyeingCommand::addAreaColorAnimation))
-                                                        .then(createAreaSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaColorAnimation))))))
-                );
-    }
-
-    private static ArgumentBuilder<CommandSourceStack, ?> createAreaComboAddBranch() {
-        return Commands.literal("combo")
-                .then(createAreaBoundsArguments(
-                        Commands.argument("color_from", StringArgumentType.word())
-                                .then(Commands.argument("color_to", StringArgumentType.word())
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .then(createAreaBoundsArguments(
+                                Commands.argument("hex_color", StringArgumentType.word())
                                         .then(Commands.argument("scale_from", FloatArgumentType.floatArg(0.01F))
                                                 .then(Commands.argument("scale_to", FloatArgumentType.floatArg(0.01F))
                                                         .then(Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F))
                                                                 .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
-                                                                        .then(Commands.argument("scale_period", IntegerArgumentType.integer(1))
-                                                                                .then(Commands.argument("color_period", IntegerArgumentType.integer(1))
-                                                                                        .executes(DyeingCommand::addAreaCombinedAnimation)
-                                                                                        .then(createAreaRotationOptions(DyeingCommand::addAreaCombinedAnimation))
-                                                                                        .then(createAreaComboAnimationOptions(DyeingCommand::addAreaCombinedAnimation))))))))))
-                );
+                                                                        .then(Commands.argument("period", IntegerArgumentType.integer(1))
+                                                                                .executes(DyeingCommand::addAreaScaleAnimation)
+                                                                                .then(createAreaRotationOptions(DyeingCommand::addAreaScaleAnimation))
+                                                                                .then(createAreaSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaScaleAnimation))))))))
+                        ));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createAreaColorAddBranch() {
+        return Commands.literal("color")
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .then(createAreaBoundsArguments(
+                                Commands.argument("color_from", StringArgumentType.word())
+                                        .then(Commands.argument("color_to", StringArgumentType.word())
+                                                .then(Commands.argument("scale", FloatArgumentType.floatArg(0.01F))
+                                                        .then(Commands.argument("period", IntegerArgumentType.integer(1))
+                                                                .executes(DyeingCommand::addAreaColorAnimation)
+                                                                .then(createAreaRotationOptions(DyeingCommand::addAreaColorAnimation))
+                                                                .then(createAreaSingleAnimationOptions("play_count", "end_action", DyeingCommand::addAreaColorAnimation))))))
+                        ));
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> createAreaComboAddBranch() {
+        return Commands.literal("combo")
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .then(createAreaBoundsArguments(
+                                Commands.argument("color_from", StringArgumentType.word())
+                                        .then(Commands.argument("color_to", StringArgumentType.word())
+                                                .then(Commands.argument("scale_from", FloatArgumentType.floatArg(0.01F))
+                                                        .then(Commands.argument("scale_to", FloatArgumentType.floatArg(0.01F))
+                                                                .then(Commands.argument("alpha_from", FloatArgumentType.floatArg(0.0F, 1.0F))
+                                                                        .then(Commands.argument("alpha_to", FloatArgumentType.floatArg(0.0F, 1.0F))
+                                                                                .then(Commands.argument("scale_period", IntegerArgumentType.integer(1))
+                                                                                        .then(Commands.argument("color_period", IntegerArgumentType.integer(1))
+                                                                                                .executes(DyeingCommand::addAreaCombinedAnimation)
+                                                                                                .then(createAreaRotationOptions(DyeingCommand::addAreaCombinedAnimation))
+                                                                                                .then(createAreaComboAnimationOptions(DyeingCommand::addAreaCombinedAnimation))))))))))
+                        ));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> createAreaBoundsArguments(ArgumentBuilder<CommandSourceStack, ?> next) {
@@ -264,6 +285,7 @@ public final class DyeingCommand {
     }
 
     private static int addStatic(CommandContext<CommandSourceStack> context, float scale) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         UUID entityUuid = UuidArgument.getUuid(context, "entity_uuid");
         LivingEntity entity = findLoadedLivingEntity(context.getSource(), entityUuid);
         String colorInput = StringArgumentType.getString(context, "hex_color");
@@ -271,17 +293,18 @@ public final class DyeingCommand {
 
         PaintData paintData = PaintData.staticPaint(argb, scale, getOffsetX(context), getOffsetY(context), getOffsetZ(context), getCurrentGameTime(context));
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
-        savedData.put(entityUuid, paintData);
-        DyeingMod.broadcastUpdate(entityUuid, paintData);
+        savedData.put(entityUuid, id, paintData);
+        DyeingMod.broadcastUpdate(entityUuid, id, paintData);
 
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加油漆层，颜色=" + formatArgb(argb) + "，缩放=" + scale),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加油漆层 id=" + id + "，颜色=" + formatArgb(argb) + "，缩放=" + scale),
                 true
         );
         return 1;
     }
 
     private static int addScaleAnimation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         UUID entityUuid = UuidArgument.getUuid(context, "entity_uuid");
         LivingEntity entity = findLoadedLivingEntity(context.getSource(), entityUuid);
         int argb = ColorParser.parse(StringArgumentType.getString(context, "hex_color"));
@@ -306,17 +329,18 @@ public final class DyeingCommand {
                 getOptionalEndAction(context, "end_action")
         );
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
-        savedData.put(entityUuid, paintData);
-        DyeingMod.broadcastUpdate(entityUuid, paintData);
+        savedData.put(entityUuid, id, paintData);
+        DyeingMod.broadcastUpdate(entityUuid, id, paintData);
 
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加缩放动画油漆层"),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加缩放动画油漆层 id=" + id),
                 true
         );
         return 1;
     }
 
     private static int addColorAnimation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         UUID entityUuid = UuidArgument.getUuid(context, "entity_uuid");
         LivingEntity entity = findLoadedLivingEntity(context.getSource(), entityUuid);
         int colorFrom = ColorParser.parse(StringArgumentType.getString(context, "color_from"));
@@ -337,17 +361,18 @@ public final class DyeingCommand {
                 getOptionalEndAction(context, "end_action")
         );
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
-        savedData.put(entityUuid, paintData);
-        DyeingMod.broadcastUpdate(entityUuid, paintData);
+        savedData.put(entityUuid, id, paintData);
+        DyeingMod.broadcastUpdate(entityUuid, id, paintData);
 
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加颜色渐变油漆层"),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加颜色渐变油漆层 id=" + id),
                 true
         );
         return 1;
     }
 
     private static int addCombinedAnimation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         UUID entityUuid = UuidArgument.getUuid(context, "entity_uuid");
         LivingEntity entity = findLoadedLivingEntity(context.getSource(), entityUuid);
         int colorFrom = ColorParser.parse(StringArgumentType.getString(context, "color_from"));
@@ -378,11 +403,11 @@ public final class DyeingCommand {
                 getOptionalEndAction(context, "color_end_action")
         );
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
-        savedData.put(entityUuid, paintData);
-        DyeingMod.broadcastUpdate(entityUuid, paintData);
+        savedData.put(entityUuid, id, paintData);
+        DyeingMod.broadcastUpdate(entityUuid, id, paintData);
 
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加组合动画油漆层"),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 添加组合动画油漆层 id=" + id),
                 true
         );
         return 1;
@@ -390,32 +415,35 @@ public final class DyeingCommand {
 
     private static int removePaint(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         UUID entityUuid = UuidArgument.getUuid(context, "entity_uuid");
+        String id = StringArgumentType.getString(context, "id");
         PaintSavedData savedData = DyeingMod.getPaintData(context.getSource().getServer());
-        if (!savedData.remove(entityUuid)) {
+        if (!savedData.remove(entityUuid, id)) {
             throw NO_PAINT_DATA.create();
         }
 
-        DyeingMod.broadcastRemove(entityUuid);
-        context.getSource().sendSuccess(() -> Component.literal("已移除实体 " + entityUuid + " 的油漆层"), true);
+        DyeingMod.broadcastRemove(entityUuid, id);
+        context.getSource().sendSuccess(() -> Component.literal("已移除实体 " + entityUuid + " 的油漆层 id=" + id), true);
         return 1;
     }
 
     private static int addAreaStatic(CommandContext<CommandSourceStack> context, float scale) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         Entity entity = findLoadedEntity(context.getSource(), UuidArgument.getUuid(context, "entity_uuid"));
         int argb = ColorParser.parse(StringArgumentType.getString(context, "hex_color"));
         PaintData paintData = PaintData.staticPaint(argb, scale, 0.0F, 0.0F, 0.0F, getCurrentGameTime(context));
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
-        savedData.put(entity.getUUID(), areaPaintData);
-        DyeingMod.broadcastAreaUpdate(entity.getUUID(), areaPaintData);
+        savedData.put(entity.getUUID(), id, areaPaintData);
+        DyeingMod.broadcastAreaUpdate(entity.getUUID(), id, areaPaintData);
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定静态区域油漆"),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定静态区域油漆 id=" + id),
                 true
         );
         return 1;
     }
 
     private static int addAreaScaleAnimation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         Entity entity = findLoadedEntity(context.getSource(), UuidArgument.getUuid(context, "entity_uuid"));
         int argb = ColorParser.parse(StringArgumentType.getString(context, "hex_color"));
         PaintData paintData = PaintData.withScaleAnimation(
@@ -434,16 +462,17 @@ public final class DyeingCommand {
         );
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
-        savedData.put(entity.getUUID(), areaPaintData);
-        DyeingMod.broadcastAreaUpdate(entity.getUUID(), areaPaintData);
+        savedData.put(entity.getUUID(), id, areaPaintData);
+        DyeingMod.broadcastAreaUpdate(entity.getUUID(), id, areaPaintData);
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定缩放动画区域油漆"),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定缩放动画区域油漆 id=" + id),
                 true
         );
         return 1;
     }
 
     private static int addAreaColorAnimation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         Entity entity = findLoadedEntity(context.getSource(), UuidArgument.getUuid(context, "entity_uuid"));
         PaintData paintData = PaintData.withColorAnimation(
                 ColorParser.parse(StringArgumentType.getString(context, "color_from")),
@@ -459,16 +488,17 @@ public final class DyeingCommand {
         );
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
-        savedData.put(entity.getUUID(), areaPaintData);
-        DyeingMod.broadcastAreaUpdate(entity.getUUID(), areaPaintData);
+        savedData.put(entity.getUUID(), id, areaPaintData);
+        DyeingMod.broadcastAreaUpdate(entity.getUUID(), id, areaPaintData);
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定颜色渐变区域油漆"),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定颜色渐变区域油漆 id=" + id),
                 true
         );
         return 1;
     }
 
     private static int addAreaCombinedAnimation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(context, "id");
         Entity entity = findLoadedEntity(context.getSource(), UuidArgument.getUuid(context, "entity_uuid"));
         PaintData paintData = PaintData.withCombinedAnimation(
                 ColorParser.parse(StringArgumentType.getString(context, "color_from")),
@@ -490,10 +520,10 @@ public final class DyeingCommand {
         );
         AreaPaintData areaPaintData = createAreaPaintData(context, paintData);
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
-        savedData.put(entity.getUUID(), areaPaintData);
-        DyeingMod.broadcastAreaUpdate(entity.getUUID(), areaPaintData);
+        savedData.put(entity.getUUID(), id, areaPaintData);
+        DyeingMod.broadcastAreaUpdate(entity.getUUID(), id, areaPaintData);
         context.getSource().sendSuccess(
-                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定组合动画区域油漆"),
+                () -> Component.literal("已为实体 " + entity.getName().getString() + " 绑定组合动画区域油漆 id=" + id),
                 true
         );
         return 1;
@@ -501,34 +531,13 @@ public final class DyeingCommand {
 
     private static int removeArea(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         UUID entityUuid = UuidArgument.getUuid(context, "entity_uuid");
+        String id = StringArgumentType.getString(context, "id");
         AreaPaintSavedData savedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
-        if (!savedData.remove(entityUuid)) {
+        if (!savedData.remove(entityUuid, id)) {
             throw NO_AREA_PAINT_DATA.create();
         }
-        DyeingMod.broadcastAreaRemove(entityUuid);
-        context.getSource().sendSuccess(() -> Component.literal("已移除实体 " + entityUuid + " 的区域油漆"), true);
-        return 1;
-    }
-
-    private static int removeAll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        UUID entityUuid = UuidArgument.getUuid(context, "entity_uuid");
-        PaintSavedData paintSavedData = DyeingMod.getPaintData(context.getSource().getServer());
-        AreaPaintSavedData areaPaintSavedData = DyeingMod.getAreaPaintData(context.getSource().getServer());
-
-        boolean removedPaint = paintSavedData.remove(entityUuid);
-        boolean removedArea = areaPaintSavedData.remove(entityUuid);
-        if (!removedPaint && !removedArea) {
-            throw new SimpleCommandExceptionType(Component.literal("该 UUID 没有已保存的油漆层或区域油漆数据")).create();
-        }
-
-        if (removedPaint) {
-            DyeingMod.broadcastRemove(entityUuid);
-        }
-        if (removedArea) {
-            DyeingMod.broadcastAreaRemove(entityUuid);
-        }
-
-        context.getSource().sendSuccess(() -> Component.literal("已移除实体 " + entityUuid + " 的全部油漆数据"), true);
+        DyeingMod.broadcastAreaRemove(entityUuid, id);
+        context.getSource().sendSuccess(() -> Component.literal("已移除实体 " + entityUuid + " 的区域油漆 id=" + id), true);
         return 1;
     }
 

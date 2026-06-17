@@ -75,45 +75,56 @@ public final class DyeingNetwork {
         registered = true;
     }
 
-    public static void sendFullSync(ServerPlayer player, Map<UUID, PaintData> entries) {
+    public static void sendFullSync(ServerPlayer player, Map<UUID, Map<String, PaintData>> entries) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PaintSyncS2CPacket(entries));
     }
 
-    public static void broadcastUpdate(UUID entityUuid, PaintData paintData) {
-        CHANNEL.send(PacketDistributor.ALL.noArg(), new PaintUpdateS2CPacket(entityUuid, false, paintData));
+    public static void broadcastUpdate(UUID entityUuid, String id, PaintData paintData) {
+        CHANNEL.send(PacketDistributor.ALL.noArg(), new PaintUpdateS2CPacket(entityUuid, id, false, paintData));
     }
 
-    public static void broadcastRemove(UUID entityUuid) {
-        CHANNEL.send(PacketDistributor.ALL.noArg(), new PaintUpdateS2CPacket(entityUuid, true, null));
+    public static void broadcastRemove(UUID entityUuid, String id) {
+        CHANNEL.send(PacketDistributor.ALL.noArg(), new PaintUpdateS2CPacket(entityUuid, id, true, null));
     }
 
-    public static void sendFullAreaSync(ServerPlayer player, Map<UUID, AreaPaintData> entries) {
+    public static void sendFullAreaSync(ServerPlayer player, Map<UUID, Map<String, AreaPaintData>> entries) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new AreaPaintSyncS2CPacket(entries));
     }
 
-    public static void broadcastAreaUpdate(UUID entityUuid, AreaPaintData areaPaintData) {
-        CHANNEL.send(PacketDistributor.ALL.noArg(), new AreaPaintUpdateS2CPacket(entityUuid, true, areaPaintData));
+    public static void broadcastAreaUpdate(UUID entityUuid, String id, AreaPaintData areaPaintData) {
+        CHANNEL.send(PacketDistributor.ALL.noArg(), new AreaPaintUpdateS2CPacket(entityUuid, id, true, areaPaintData));
     }
 
-    public static void broadcastAreaRemove(UUID entityUuid) {
-        CHANNEL.send(PacketDistributor.ALL.noArg(), new AreaPaintUpdateS2CPacket(entityUuid, false, null));
+    public static void broadcastAreaRemove(UUID entityUuid, String id) {
+        CHANNEL.send(PacketDistributor.ALL.noArg(), new AreaPaintUpdateS2CPacket(entityUuid, id, false, null));
     }
 
-    private record PaintSyncS2CPacket(Map<UUID, PaintData> entries) {
+    private record PaintSyncS2CPacket(Map<UUID, Map<String, PaintData>> entries) {
         private static void encode(PaintSyncS2CPacket packet, FriendlyByteBuf buffer) {
             buffer.writeVarInt(packet.entries.size());
-            for (Map.Entry<UUID, PaintData> entry : packet.entries.entrySet()) {
-                buffer.writeUUID(entry.getKey());
-                writePaintData(buffer, entry.getValue());
+            for (Map.Entry<UUID, Map<String, PaintData>> entityEntry : packet.entries.entrySet()) {
+                buffer.writeUUID(entityEntry.getKey());
+                Map<String, PaintData> paints = entityEntry.getValue();
+                buffer.writeVarInt(paints.size());
+                for (Map.Entry<String, PaintData> paintEntry : paints.entrySet()) {
+                    buffer.writeUtf(paintEntry.getKey());
+                    writePaintData(buffer, paintEntry.getValue());
+                }
             }
         }
 
         private static PaintSyncS2CPacket decode(FriendlyByteBuf buffer) {
-            int size = buffer.readVarInt();
-            Map<UUID, PaintData> entries = new HashMap<>();
-            for (int i = 0; i < size; i++) {
+            int entityCount = buffer.readVarInt();
+            Map<UUID, Map<String, PaintData>> entries = new HashMap<>();
+            for (int i = 0; i < entityCount; i++) {
                 UUID entityUuid = buffer.readUUID();
-                entries.put(entityUuid, readPaintData(buffer));
+                int paintCount = buffer.readVarInt();
+                Map<String, PaintData> paints = new HashMap<>();
+                for (int j = 0; j < paintCount; j++) {
+                    String id = buffer.readUtf();
+                    paints.put(id, readPaintData(buffer));
+                }
+                entries.put(entityUuid, paints);
             }
             return new PaintSyncS2CPacket(entries);
         }
@@ -125,9 +136,10 @@ public final class DyeingNetwork {
         }
     }
 
-    private record PaintUpdateS2CPacket(UUID entityUuid, boolean remove, PaintData paintData) {
+    private record PaintUpdateS2CPacket(UUID entityUuid, String id, boolean remove, PaintData paintData) {
         private static void encode(PaintUpdateS2CPacket packet, FriendlyByteBuf buffer) {
             buffer.writeUUID(packet.entityUuid);
+            buffer.writeUtf(packet.id);
             buffer.writeBoolean(packet.remove);
             if (!packet.remove) {
                 writePaintData(buffer, packet.paintData);
@@ -136,43 +148,54 @@ public final class DyeingNetwork {
 
         private static PaintUpdateS2CPacket decode(FriendlyByteBuf buffer) {
             UUID entityUuid = buffer.readUUID();
+            String id = buffer.readUtf();
             boolean remove = buffer.readBoolean();
             if (remove) {
-                return new PaintUpdateS2CPacket(entityUuid, true, null);
+                return new PaintUpdateS2CPacket(entityUuid, id, true, null);
             }
-
             PaintData paintData = readPaintData(buffer);
-            return new PaintUpdateS2CPacket(entityUuid, false, paintData);
+            return new PaintUpdateS2CPacket(entityUuid, id, false, paintData);
         }
 
         private static void handle(PaintUpdateS2CPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
             NetworkEvent.Context context = contextSupplier.get();
             context.enqueueWork(() -> {
                 if (packet.remove) {
-                    ClientPaintManager.remove(packet.entityUuid);
+                    ClientPaintManager.remove(packet.entityUuid, packet.id);
                 } else {
-                    ClientPaintManager.put(packet.entityUuid, packet.paintData);
+                    ClientPaintManager.put(packet.entityUuid, packet.id, packet.paintData);
                 }
             });
             context.setPacketHandled(true);
         }
     }
 
-    private record AreaPaintSyncS2CPacket(Map<UUID, AreaPaintData> entries) {
+    private record AreaPaintSyncS2CPacket(Map<UUID, Map<String, AreaPaintData>> entries) {
         private static void encode(AreaPaintSyncS2CPacket packet, FriendlyByteBuf buffer) {
             buffer.writeVarInt(packet.entries.size());
-            for (Map.Entry<UUID, AreaPaintData> entry : packet.entries.entrySet()) {
-                buffer.writeUUID(entry.getKey());
-                writeAreaPaintData(buffer, entry.getValue());
+            for (Map.Entry<UUID, Map<String, AreaPaintData>> entityEntry : packet.entries.entrySet()) {
+                buffer.writeUUID(entityEntry.getKey());
+                Map<String, AreaPaintData> areas = entityEntry.getValue();
+                buffer.writeVarInt(areas.size());
+                for (Map.Entry<String, AreaPaintData> areaEntry : areas.entrySet()) {
+                    buffer.writeUtf(areaEntry.getKey());
+                    writeAreaPaintData(buffer, areaEntry.getValue());
+                }
             }
         }
 
         private static AreaPaintSyncS2CPacket decode(FriendlyByteBuf buffer) {
-            int size = buffer.readVarInt();
-            Map<UUID, AreaPaintData> entries = new HashMap<>();
-            for (int i = 0; i < size; i++) {
+            int entityCount = buffer.readVarInt();
+            Map<UUID, Map<String, AreaPaintData>> entries = new HashMap<>();
+            for (int i = 0; i < entityCount; i++) {
                 UUID entityUuid = buffer.readUUID();
-                entries.put(entityUuid, readAreaPaintData(buffer));
+                int areaCount = buffer.readVarInt();
+                Map<String, AreaPaintData> areas = new HashMap<>();
+                for (int j = 0; j < areaCount; j++) {
+                    String id = buffer.readUtf();
+                    areas.put(id, readAreaPaintData(buffer));
+                }
+                entries.put(entityUuid, areas);
             }
             return new AreaPaintSyncS2CPacket(entries);
         }
@@ -184,9 +207,10 @@ public final class DyeingNetwork {
         }
     }
 
-    private record AreaPaintUpdateS2CPacket(UUID entityUuid, boolean present, AreaPaintData areaPaintData) {
+    private record AreaPaintUpdateS2CPacket(UUID entityUuid, String id, boolean present, AreaPaintData areaPaintData) {
         private static void encode(AreaPaintUpdateS2CPacket packet, FriendlyByteBuf buffer) {
             buffer.writeUUID(packet.entityUuid);
+            buffer.writeUtf(packet.id);
             buffer.writeBoolean(packet.present);
             if (packet.present) {
                 writeAreaPaintData(buffer, packet.areaPaintData);
@@ -195,20 +219,21 @@ public final class DyeingNetwork {
 
         private static AreaPaintUpdateS2CPacket decode(FriendlyByteBuf buffer) {
             UUID entityUuid = buffer.readUUID();
+            String id = buffer.readUtf();
             boolean present = buffer.readBoolean();
             if (!present) {
-                return new AreaPaintUpdateS2CPacket(entityUuid, false, null);
+                return new AreaPaintUpdateS2CPacket(entityUuid, id, false, null);
             }
-            return new AreaPaintUpdateS2CPacket(entityUuid, true, readAreaPaintData(buffer));
+            return new AreaPaintUpdateS2CPacket(entityUuid, id, true, readAreaPaintData(buffer));
         }
 
         private static void handle(AreaPaintUpdateS2CPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
             NetworkEvent.Context context = contextSupplier.get();
             context.enqueueWork(() -> {
                 if (packet.present) {
-                    ClientPaintManager.putArea(packet.entityUuid, packet.areaPaintData);
+                    ClientPaintManager.putArea(packet.entityUuid, packet.id, packet.areaPaintData);
                 } else {
-                    ClientPaintManager.removeArea(packet.entityUuid);
+                    ClientPaintManager.removeArea(packet.entityUuid, packet.id);
                 }
             });
             context.setPacketHandled(true);
